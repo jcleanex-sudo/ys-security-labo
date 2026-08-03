@@ -34,7 +34,7 @@ jobs:
       - name: Build static artifact
         run: |
           mkdir _site
-          cp -R index.html style.css app.js core.js data _site/
+          cp -R index.html style.css app.js core.js data keirin _site/
       - uses: actions/configure-pages@v5
         with:
           enablement: true

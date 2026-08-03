@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="ラインと市場価格を複合評価する、安全優先の競輪予想検証サイト">
+  <meta name="theme-color" content="#0b0714">
+  <title>KEIRIN EDGE LAB | ラインを読み、見送る</title>
+  <link rel="stylesheet" href="keirin.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top"><span>K</span><strong>KEIRIN EDGE LAB<small>LINE × EDGE × SAFETY</small></strong></a>
+    <nav><a href="#review">手動予想</a><a href="#ranking">期待度</a><a href="#logic">ロジック</a><a href="#policy">データ方針</a><a href="../">競馬版 ↗</a></nav>
+    <b class="mode">FREE / MANUAL</b>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">READ THE LINE. PRICE THE RISK.</p>
+        <h1>ラインを読み、<br><em>無理な車券を切る。</em></h1>
+        <p>競走得点だけで決めない。ライン、番手、脚質、バンク特性、直前オッズの一致を確認し、net edgeが残るレースだけを仮想検証します。</p>
+        <div class="hero-actions"><a href="#review" class="primary">レースを評価する →</a><a href="#ranking">見送り対象を見る</a></div>
+        <ul><li>無断スクレイピングなし</li><li>推測補完なし</li><li>締切5分前停止</li><li>全レース比較</li></ul>
+      </div>
+      <aside class="live-panel">
+        <div class="panel-top"><span>PUBLIC DATA STATUS</span><b id="globalStatus">DATA BLOCKED</b></div>
+        <div class="track-ring"><div><small>DATA<br>COVERAGE</small><strong id="coverage">0%</strong></div></div>
+        <div class="panel-grid"><div><small>登録</small><b id="raceCount">0</b></div><div><small>厳格枠</small><b id="strictCount">0</b></div><div><small>実験枠</small><b id="experimentalCount">0</b></div></div>
+        <p>公式情報の利用条件とデータ鮮度を確認できるまで購入判断は出しません。</p>
+      </aside>
+    </section>
+
+    <section id="review" class="review-shell">
+      <div class="section-head"><div><p class="eyebrow">MANUAL RACE REVIEW</p><h2>開催・レース選択</h2></div><p>入力はこの端末だけに保存。公開サイトへ自動送信しません。</p></div>
+      <form id="raceSelector" class="selector">
+        <label>開催日<input id="raceDate" type="date" required></label>
+        <label>競輪場<select id="venue"></select></label>
+        <label>レース<select id="raceNumber"></select></label>
+        <button type="submit">このレースを開く</button>
+      </form>
+      <div class="decision-strip"><div><small>現在判断</small><strong id="decision">DATA BLOCKED</strong></div><div><small>使用ロジック</small><b>競走得点 × ライン × 番手 × 脚質 × バンク × 市場価格</b></div><button id="shareButton" type="button">共有URL</button></div>
+
+      <form id="manualForm" class="manual-form">
+        <div class="metric-inputs">
+          <label>発走時刻<input id="startTime" type="time"></label>
+          <label>確認時刻<input id="observedAt" type="datetime-local"></label>
+          <label>モデル確率 %<input id="modelProbability" type="number" min="0" max="100" step=".1"></label>
+          <label>市場確率 %<input id="marketProbability" type="number" min="0" max="100" step=".1"></label>
+          <label>confidence %<input id="confidence" type="number" min="0" max="100"></label>
+          <label>因子一致度 %<input id="agreement" type="number" min="0" max="100"></label>
+          <label>データ取得率 %<input id="dataRate" type="number" min="0" max="100"></label>
+          <label>コスト控除 %<input id="costRate" type="number" min="0" max="20" step=".1" value="2"></label>
+        </div>
+        <div class="text-inputs"><label>想定ライン<input id="linePlan" type="text" placeholder="例：1-5-7 / 2-4 / 3-6"></label><label>重要根拠<textarea id="reasons" rows="3" placeholder="番手の競走得点が上位&#10;先行1車で展開利&#10;バンク適性を確認"></textarea></label><label>無効条件<textarea id="invalidConditions" rows="2" placeholder="並び変更、欠場、オッズ急落、締切5分未満"></textarea></label></div>
+
+        <div class="rider-head"><div><h3>車番・選手・脚質・評価</h3><p>5〜9車。評価値順から3連単12点を生成します。</p></div><button id="addRider" type="button">＋ 選手</button></div>
+        <div id="riderRows" class="rider-rows"></div>
+        <div class="form-actions"><button class="primary" type="submit">予想を保存・再計算</button><button id="clearRace" type="button">このレースを消去</button></div>
+      </form>
+
+      <div class="number-grid"><article><small>モデル確率</small><b id="modelValue">--</b></article><article><small>市場確率</small><b id="marketValue">--</b></article><article><small>net edge</small><b id="edgeValue">--</b></article><article><small>confidence</small><b id="confidenceValue">--</b></article><article><small>一致度</small><b id="agreementValue">--</b></article><article><small>残り時間</small><b id="remainingValue">--</b></article></div>
+
+      <div class="ticket-grid"><section><div class="ticket-head"><h3>本線 6点</h3><span>1着 / 2着 / 3着</span></div><div id="mainTickets" class="tickets"></div></section><section><div class="ticket-head"><h3>押さえ 6点</h3><span>1着 / 2着 / 3着</span></div><div id="coverTickets" class="tickets"></div></section></div>
+      <p class="fineprint">点別net edgeは、評価値から算出した順序確率 × 手入力3連単オッズ − 1 − コストで比較。オッズがなければ順位を出しません。</p>
+    </section>
+
+    <section id="ranking" class="ranking-section">
+      <div class="section-head"><div><p class="eyebrow">EXPECTATION RANKING</p><h2>期待度ランキング</h2></div><p><b id="rankingStatus">DATA BLOCKED</b> 全レースを同じ基準で比較</p></div>
+      <div id="rankingGrid" class="ranking-grid"></div>
+      <div class="skip-panel"><div><p class="eyebrow">SKIP LIST</p><h3>見送り対象</h3></div><div id="skipList"></div></div>
+    </section>
+
+    <section id="logic" class="logic-section">
+      <div class="section-head"><div><p class="eyebrow">COMPOSITE LOGIC</p><h2>単一指標で買わない。</h2></div><p>ライン変更や直前オッズで局面が変われば、判断を再計算します。</p></div>
+      <div class="logic-grid"><article><b>01</b><h3>競走得点</h3><p>級班・近況・対戦水準を確認</p></article><article><b>02</b><h3>ライン構成</h3><p>先頭・番手・三番手の役割を評価</p></article><article><b>03</b><h3>脚質と展開</h3><p>逃げ・捲り・差しの競合を確認</p></article><article><b>04</b><h3>バンク適性</h3><p>周長・直線・風の影響を確認</p></article><article><b>05</b><h3>市場価格</h3><p>手数料控除後のedgeで順位化</p></article></div>
+    </section>
+
+    <section id="policy" class="policy-section">
+      <article><p class="eyebrow">LEARNING STATUS</p><h2>時系列検証</h2><dl><div><dt>過去レース</dt><dd>0件</dd></div><div><dt>検証状態</dt><dd class="blocked">DATA BLOCKED</dd></div><div><dt>重み更新</dt><dd>未実施</dd></div><div><dt>安全基準</dt><dd>全条件通過のみ</dd></div></dl><p>最低200件、検証期間60件が揃うまで学習しません。</p></article>
+      <article><p class="eyebrow">DATA GOVERNANCE</p><h2>取れないなら止める。</h2><ul><li>KEIRIN.JPを無断収集・転載しない</li><li>許諾済みデータまたは手入力だけ使用</li><li>並び・欠場・オッズを推測補完しない</li><li>古い情報や締切直前は見送り</li></ul><a href="https://keirin.jp/sp/dfw/portal/guest/policy/index.html" target="_blank" rel="noopener">KEIRIN.JP サイトポリシー ↗</a></article>
+    </section>
+  </main>
+
+  <footer><b>KEIRIN EDGE LAB</b><p>利益や的中を保証するものではなく、検証中の分析情報です。車券購入は自己責任で行ってください。</p></footer>
+  <template id="riderTemplate"><div class="rider-row"><label>車番<input data-field="number" type="number" min="1" max="9"></label><label>選手名<input data-field="name" type="text" maxlength="30"></label><label>脚質<select data-field="style"><option>逃</option><option>両</option><option selected>追</option></select></label><label>評価値<input data-field="score" type="number" min=".1" max="100" step=".1"></label><button data-action="remove" type="button" aria-label="選手を削除">×</button></div></template>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
