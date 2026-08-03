@@ -1,0 +1,17 @@
+{
+  "history": {
+    "total_races": 0,
+    "validated_races": 0,
+    "net_profit": null,
+    "profit_factor": null,
+    "max_drawdown": null,
+    "win_rate_ci95": null
+  },
+  "learning": {
+    "status": "DATA BLOCKED",
+    "message": "利用条件を確認した過去レースが不足しています（最低200件、検証期間60件）",
+    "logic_version": "manual-composite-v1",
+    "evaluated_at": "2026-08-03T17:40:23+00:00",
+    "weight_updated": false
+  }
+}

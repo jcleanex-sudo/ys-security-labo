@@ -1,0 +1,12 @@
+{
+  "logic_version": "manual-composite-v1",
+  "active_weights": {
+    "ability": 0.3,
+    "pace": 0.2,
+    "going": 0.2,
+    "market": 0.2,
+    "freshness": 0.1
+  },
+  "updated_at": null,
+  "update_reason": "initial_defaults"
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="手入力または利用許諾済みデータだけで検証する、競馬予想リサーチサイト">
+  <meta name="theme-color" content="#07110d">
+  <title>KEIBA EDGE LAB | 負けないための競馬検証</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="KEIBA EDGE LAB トップ"><span>K</span><strong>KEIBA EDGE LAB<small>SAFETY FIRST</small></strong></a>
+    <nav><a href="#prediction">手動予想</a><a href="#ranking">期待度</a><a href="#learning">検証</a><a href="#policy">データ方針</a></nav>
+    <span class="free">GITHUB PAGES</span>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">EVIDENCE BEFORE ENTRY</p>
+        <h1>当てにいく前に、<br><em>大きく負けない。</em></h1>
+        <p class="lead">開催全レースを同じ基準で手動評価し、オッズ取得後のnet edgeまで確認。根拠が揃わないレースは、迷わず見送ります。</p>
+        <div class="actions"><a class="primary" href="#prediction">レースを評価する →</a><a href="#ranking">本日の順位を見る</a></div>
+        <ul class="proof"><li>無断スクレイピングなし</li><li>推測補完なし</li><li>時系列検証</li><li>安全基準付き更新</li></ul>
+      </div>
+      <aside class="status-panel">
+        <div class="panel-head"><span>LIVE DATA STATUS</span><b id="globalStatus" class="blocked">DATA BLOCKED</b></div>
+        <div class="status-main"><small>公開可能データ取得率</small><strong id="coverageHero">0<sup>%</sup></strong></div>
+        <div class="mini-grid"><div><small>登録レース</small><b id="raceCountHero">0</b></div><div><small>厳格枠</small><b id="strictCountHero">0</b></div><div><small>実験枠</small><b id="experimentalCountHero">0</b></div><div><small>最終更新</small><b id="updatedHero">--</b></div></div>
+        <p>開催・出走馬・オッズを利用許諾済みデータまたは手入力で確認できるまで、購入判断は出しません。</p>
+      </aside>
+    </section>
+
+    <section class="workspace" id="prediction">
+      <div class="section-head"><div><p class="eyebrow">MANUAL RACE REVIEW</p><h2>開催・レース選択</h2></div><p>入力内容はこの端末に保存されます。公開データには自動反映されません。</p></div>
+      <form id="raceSelector" class="selector">
+        <label>開催日<input type="date" id="raceDate" required></label>
+        <label>競馬場<select id="venue"></select></label>
+        <label>レース<select id="raceNumber"></select></label>
+        <button type="submit">このレースを開く</button>
+      </form>
+
+      <div class="decision-bar">
+        <div><small>現在判断</small><strong id="decision" class="blocked">DATA BLOCKED</strong></div>
+        <div><small>複合ロジック</small><b>能力 × 展開 × 馬場 × 市場価格 × データ鮮度</b></div>
+        <button type="button" id="shareButton">共有URLをコピー</button>
+      </div>
+
+      <form id="manualForm" class="manual-form">
+        <div class="input-grid">
+          <label>発走時刻<input id="startTime" type="time"></label>
+          <label>データ確認時刻<input id="observedAt" type="datetime-local"></label>
+          <label>推定的中確率（%）<input id="modelProbability" type="number" min="0" max="100" step="0.1" placeholder="例 68.0"></label>
+          <label>市場確率（%）<input id="marketProbability" type="number" min="0" max="100" step="0.1" placeholder="例 58.0"></label>
+          <label>confidence（%）<input id="confidence" type="number" min="0" max="100" step="1" placeholder="例 72"></label>
+          <label>因子一致度（%）<input id="agreement" type="number" min="0" max="100" step="1" placeholder="例 75"></label>
+          <label>データ取得率（%）<input id="dataRate" type="number" min="0" max="100" step="1" placeholder="例 100"></label>
+          <label>コスト控除（%）<input id="costRate" type="number" min="0" max="20" step="0.1" value="2"></label>
+        </div>
+        <label>重要根拠（1行1項目）<textarea id="reasons" rows="4" placeholder="近3走の上がりが同条件上位&#10;想定ペースと脚質が一致&#10;馬場傾向を確認済み"></textarea></label>
+        <label>無効条件<textarea id="invalidConditions" rows="2" placeholder="馬場急変、競走除外、オッズ急落、締切5分未満など"></textarea></label>
+
+        <div class="contender-head"><div><h3>フォーメーション候補</h3><p>最大6頭。点数は馬番・評価値から生成し、3連単オッズは各点へ手入力します。</p></div><button id="addHorse" type="button">＋ 候補馬</button></div>
+        <div id="horseRows" class="horse-rows"></div>
+        <div class="form-actions"><button class="primary" type="submit">予想を保存・再計算</button><button id="clearRace" type="button">このレースを消去</button></div>
+      </form>
+
+      <div class="numbers" aria-live="polite">
+        <article><small>モデル確率</small><strong id="modelValue">--</strong></article><article><small>市場確率</small><strong id="marketValue">--</strong></article><article><small>net edge</small><strong id="edgeValue">--</strong></article><article><small>confidence</small><strong id="confidenceValue">--</strong></article><article><small>データ取得率</small><strong id="dataRateValue">--</strong></article><article><small>残り時間</small><strong id="remainingValue">--</strong></article>
+      </div>
+
+      <div class="ticket-layout">
+        <section><div class="ticket-title"><h3>本線 6点</h3><span>1着 / 2着 / 3着</span></div><div id="mainTickets" class="tickets"></div></section>
+        <section><div class="ticket-title"><h3>押さえ 6点</h3><span>1着 / 2着 / 3着</span></div><div id="coverTickets" class="tickets"></div></section>
+      </div>
+      <p class="edge-note">3連単のnet edge順位は、候補馬の評価値から算出したPlackett–Luce順序確率 × 入力オッズ − 1 − コストで比較します。オッズ未入力は順位を出しません。</p>
+    </section>
+
+    <section id="ranking" class="ranking-section">
+      <div class="section-head"><div><p class="eyebrow">EXPECTATION RANKING</p><h2>期待度ランキング</h2></div><p><span id="rankingStatus" class="status-chip blocked">DATA BLOCKED</span> 全レースを同じ安全基準で比較</p></div>
+      <div id="rankingGrid" class="ranking-grid"></div>
+      <div class="skip-box"><div><p class="eyebrow">SKIP LIST</p><h3>見送り対象</h3></div><div id="skipList"></div></div>
+    </section>
+
+    <section id="learning" class="learning-section">
+      <article>
+        <p class="eyebrow">WALK-FORWARD VALIDATION</p><h2>過去レース・時系列検証</h2>
+        <p>未来情報の混入を避け、古い期間で候補重みを作り、その後の期間だけで比較します。安全基準をすべて通過した場合だけ更新します。</p>
+        <dl><div><dt>収集済みレース</dt><dd id="historyCount">0</dd></div><div><dt>検証可能レース</dt><dd id="validatedCount">0</dd></div><div><dt>純損益</dt><dd id="netProfit">--</dd></div><div><dt>利益係数</dt><dd id="profitFactor">--</dd></div><div><dt>最大ドローダウン</dt><dd id="maxDrawdown">--</dd></div><div><dt>勝率 95% CI</dt><dd id="confidenceInterval">--</dd></div></dl>
+      </article>
+      <article>
+        <p class="eyebrow">SAFE WEIGHT UPDATE</p><h2>学習状況</h2>
+        <div class="learning-state"><strong id="learningStatus">DATA BLOCKED</strong><span id="learningMessage">履歴データが不足しています</span></div>
+        <dl><div><dt>現行ロジック</dt><dd id="logicVersion">manual-composite-v1</dd></div><div><dt>最終評価</dt><dd id="lastEvaluated">--</dd></div><div><dt>重み更新</dt><dd id="weightUpdated">未実施</dd></div><div><dt>安全基準</dt><dd>全項目通過のみ</dd></div></dl>
+        <div class="tiers"><div><span>STRICT ≥70%</span><b id="strictSamples">0件</b></div><div><span>EXPERIMENTAL 60–69%</span><b id="experimentalSamples">0件</b></div></div>
+      </article>
+    </section>
+
+    <section id="policy" class="policy-section">
+      <div class="section-head"><div><p class="eyebrow">DATA GOVERNANCE</p><h2>取得できないなら、止める。</h2></div></div>
+      <div class="policy-grid"><article><b>01</b><h3>許諾確認</h3><p>利用規約と再配信条件が確認できたデータだけを使用します。</p></article><article><b>02</b><h3>鮮度確認</h3><p>取得時刻がなく、締切までの残り時間を検証できない場合は停止します。</p></article><article><b>03</b><h3>完全性確認</h3><p>出走取消・オッズ欠損・不整合を推測で補いません。</p></article><article><b>04</b><h3>更新保護</h3><p>時系列外部検証で純損益、PF、DD、95% CIを確認してから更新します。</p></article></div>
+      <p class="source-note">データ接続方針：JRA公式ページの無断スクレイピングは行いません。JRA-VAN Data Lab等を使う場合も、契約・公開範囲・再配信可否の確認後に有効化します。</p>
+    </section>
+  </main>
+  <footer><span>KEIBA EDGE LAB</span><p>これは利益を保証するものではなく、検証中の分析情報です。馬券購入は自己責任で行ってください。</p></footer>
+  <template id="horseRowTemplate"><div class="horse-row"><label>馬番<input data-field="number" type="number" min="1" max="18"></label><label>馬名<input data-field="name" type="text" maxlength="30"></label><label>評価値<input data-field="score" type="number" min="0.1" max="100" step="0.1"></label><button data-action="remove" type="button" aria-label="候補馬を削除">×</button></div></template>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
