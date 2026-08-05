@@ -2,8 +2,8 @@ name: Auto-update KEIRIN data and Pages
 
 on:
   schedule:
-    # 08:10, 11:10, 14:10, 17:10 and 23:10 JST
-    - cron: "10 2,5,8,14,23 * * *"
+    # Hourly from 08:10 through 23:10 JST for fresher odds and result labels.
+    - cron: "10 0-14,23 * * *"
   workflow_dispatch:
     inputs:
       race_date:
