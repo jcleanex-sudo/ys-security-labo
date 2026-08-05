@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeMarketOdds, buildKeirinFormation, keirinTicketEdge, orderedChance } from "../keirin/core.js";
+import { analyzeKeirinRace, analyzeMarketOdds, buildKeirinFormation, keirinTicketEdge, orderedChance, parseOfficialPerformance, parseOfficialRiderIdentities } from "../keirin/core.js";
 
 const riders = [
   { number: 1, score: 40 },
@@ -39,4 +39,54 @@ test("market analysis returns an index and ten candidates", () => {
   assert.ok(result.index > 0 && result.index <= 99);
   assert.equal(result.tickets.length, 10);
   assert.match(result.scenario, /1着軸/);
+});
+
+test("official four-month performance is mapped by rider number", () => {
+  const tables = [[
+    ["直近4ヶ月成績 ※ 率は％表示"],
+    ["競走得点", "決まり手", "B H S", "勝率 ２連対率 ３連対率"],
+    ["88.50", "1 2 3 4", "5 6 7", "20 40 60"],
+    ["86.25", "0 1 2 3", "2 3 4", "10 30 50"],
+  ]];
+  const parsed = parseOfficialPerformance(tables, [{ number: 2 }, { number: 1 }]);
+  assert.deepEqual(parsed.map((item) => item.number), [1, 2]);
+  assert.equal(parsed[0].rating, 88.5);
+  assert.equal(parsed[0].top3Rate, 60);
+});
+
+test("official entry table recovers every rider identity without guessing", () => {
+  const tables = [[
+    ["枠番", "印", "車番", "選手名 府県/級班前現/脚質", "期別"],
+    ["", "", "6", "吉川 悟 大 阪/A3A2/追", "79 49"],
+    ["", "▲", "7", "柴田 功一郎 神奈川/A3A2/追", "79 50"],
+  ]];
+  const riders = parseOfficialRiderIdentities(tables);
+  assert.equal(riders[0].name, "吉川 悟");
+  assert.equal(riders[0].prefecture, "大阪");
+  assert.equal(riders[1].name, "柴田 功一郎");
+  assert.equal(riders[1].style, "追");
+});
+
+test("hybrid analysis exposes model probability, agreement and net edge", () => {
+  const odds = {};
+  for (const first of [1, 2, 3, 4, 5]) for (const second of [1, 2, 3, 4, 5]) for (const third of [1, 2, 3, 4, 5]) {
+    if (new Set([first, second, third]).size === 3) odds[`${first}-${second}-${third}`] = 4 + first * 8 + second * 2 + third;
+  }
+  const riders = [1, 2, 3, 4, 5].map((number) => ({
+    number,
+    performance: { rating: 92 - number, winRate: 30 - number, top2Rate: 50 - number, top3Rate: 70 - number },
+  }));
+  const result = analyzeKeirinRace({ status: "OK", odds, riders });
+  assert.equal(result.modelReady, true);
+  assert.equal(result.dataRate, 100);
+  assert.equal(result.tickets.length, 10);
+  assert.ok(result.agreement >= 0 && result.agreement <= 100);
+  assert.ok(Number.isFinite(result.tickets[0].modelProbability));
+  assert.ok(Number.isFinite(result.tickets[0].netEdge));
+});
+
+test("hybrid edge stays blocked when official performance is incomplete", () => {
+  const result = analyzeKeirinRace({ status: "OK", odds: { "1-2-3": 10 }, riders: [{ number: 1 }] });
+  assert.equal(result.modelReady, false);
+  assert.deepEqual(result.edgeTickets, []);
 });

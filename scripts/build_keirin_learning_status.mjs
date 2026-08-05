@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { analyzeKeirinRace, parseOfficialPerformance } from "../keirin/core.js";
 
 export const SAFETY_LIMITS = Object.freeze({
   minimumLabeledResults: 200,
@@ -41,6 +42,16 @@ async function walkJson(directory) {
   return files;
 }
 
+function wilsonInterval(successes, total) {
+  if (!total) return null;
+  const z = 1.959963984540054;
+  const proportion = successes / total;
+  const denominator = 1 + z ** 2 / total;
+  const center = (proportion + z ** 2 / (2 * total)) / denominator;
+  const margin = z * Math.sqrt((proportion * (1 - proportion) + z ** 2 / (4 * total)) / total) / denominator;
+  return { lower: Number((Math.max(0, center - margin) * 100).toFixed(1)), upper: Number((Math.min(1, center + margin) * 100).toFixed(1)) };
+}
+
 export async function buildLearningStatus(privateRoot) {
   const dailyRoot = path.join(privateRoot, "daily");
   const snapshotFiles = await walkJson(dailyRoot);
@@ -49,8 +60,11 @@ export async function buildLearningStatus(privateRoot) {
     try { snapshots.push(JSON.parse(await readFile(file, "utf8"))); } catch { /* invalid snapshots are excluded and counted below */ }
   }
   const latestByRace = new Map();
+  const snapshotsByRace = new Map();
   for (const record of snapshots) {
     const key = `${record.race_date}|${record.venue_code}|${record.race_number}`;
+    if (!snapshotsByRace.has(key)) snapshotsByRace.set(key, []);
+    snapshotsByRace.get(key).push(record);
     const previous = latestByRace.get(key);
     if (!previous || String(record.extracted_at) > String(previous.extracted_at)) latestByRace.set(key, record);
   }
@@ -69,6 +83,43 @@ export async function buildLearningStatus(privateRoot) {
     if (!previous || String(record.extracted_at) > String(previous.extracted_at)) latestResultByRace.set(key, record);
   }
   const labeled = [...latestResultByRace.values()].filter((record) => record.status === "OK" && Array.isArray(record.finish_order) && record.finish_order.length >= 3);
+  let marketTop10Hits = 0;
+  let hybridTop10Hits = 0;
+  let evaluableRaces = 0;
+  for (const [key, raceSnapshots] of snapshotsByRace) {
+    const result = latestResultByRace.get(key);
+    if (result?.status !== "OK" || !result.trifecta_combination) continue;
+    const oddsRecord = [...raceSnapshots].filter((record) => record.status === "OK" && Object.keys(record.odds || {}).length > 0)
+      .sort((a, b) => String(b.extracted_at).localeCompare(String(a.extracted_at)))[0];
+    if (!oddsRecord) continue;
+    const basicRecord = [...raceSnapshots].sort((a, b) => {
+      const performanceDifference = parseOfficialPerformance(b.basic_tables, b.riders).length - parseOfficialPerformance(a.basic_tables, a.riders).length;
+      if (performanceDifference) return performanceDifference;
+      return (b.riders || []).filter((rider) => rider.name).length - (a.riders || []).filter((rider) => rider.name).length;
+    })[0];
+    const performance = new Map(parseOfficialPerformance(basicRecord.basic_tables, basicRecord.riders).map((item) => [item.number, item]));
+    const riders = (basicRecord.riders || []).filter((rider) => Number.isInteger(Number(rider.number))).map((rider) => ({
+      number: Number(rider.number),
+      performance: rider.performance || performance.get(Number(rider.number)) || null,
+    }));
+    const analysis = analyzeKeirinRace({ status: "OK", odds: oddsRecord.odds, riders });
+    if (!analysis.modelReady) continue;
+    const marketTop10 = Object.entries(oddsRecord.odds).sort((a, b) => Number(a[1]) - Number(b[1])).slice(0, 10).map(([combo]) => combo);
+    evaluableRaces += 1;
+    if (marketTop10.includes(result.trifecta_combination)) marketTop10Hits += 1;
+    if (analysis.tickets.some((ticket) => ticket.combo === result.trifecta_combination)) hybridTop10Hits += 1;
+  }
+  const diagnostics = {
+    status: evaluableRaces ? "RETROSPECTIVE_ONLY" : "DATA BLOCKED",
+    fixedOfficialWeight: 0.25,
+    evaluableRaces,
+    marketTop10Hits,
+    hybridTop10Hits,
+    marketTop10HitRate: evaluableRaces ? Number((marketTop10Hits / evaluableRaces * 100).toFixed(1)) : null,
+    hybridTop10HitRate: evaluableRaces ? Number((hybridTop10Hits / evaluableRaces * 100).toFixed(1)) : null,
+    hybridHitRateInterval95: wilsonInterval(hybridTop10Hits, evaluableRaces),
+    eligibleForWeightUpdate: false,
+  };
   const dataCompleteness = latest.length ? completeLatest / latest.length * 100 : 0;
   const metrics = {
     dataCompleteness,
@@ -77,7 +128,7 @@ export async function buildLearningStatus(privateRoot) {
     chronologicalSplit: false,
     profitFactor: null,
     maximumDrawdown: null,
-    confidenceInterval95: false,
+    confidenceInterval95: evaluableRaces >= SAFETY_LIMITS.minimumLabeledResults && observedDates.size >= SAFETY_LIMITS.minimumObservedDays,
   };
   const safety = evaluateLearningSafety(metrics);
   return {
@@ -94,13 +145,14 @@ export async function buildLearningStatus(privateRoot) {
     chronologicalSplit: false,
     profitFactor: null,
     maximumDrawdown: null,
-    confidenceInterval95: null,
+    confidenceInterval95: diagnostics.hybridHitRateInterval95,
+    diagnostics,
     weightUpdateAllowed: safety.allowed,
     failedGates: safety.failed,
     limits: SAFETY_LIMITS,
     note: safety.allowed
       ? "全安全基準を通過しました。別工程の承認後にのみ重み更新できます。"
-      : "結果ラベルと検証期間が不足しているため、重みは更新していません。",
+      : "固定重みの回顧診断のみ実施。結果ラベル・検証期間・時系列分割が安全基準を満たすまで、重みは更新しません。",
   };
 }
 

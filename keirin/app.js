@@ -1,4 +1,4 @@
-import { analyzeMarketOdds } from "./core.js?v=20260804-4";
+import { analyzeKeirinRace } from "./core.js?v=20260806-1";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -11,7 +11,7 @@ function selectedRace() { return selectedVenue()?.races.find((race) => race.numb
 function fmtDate(value) { return value ? value.replaceAll("-", "/") : "--"; }
 function formatOdds(value) { return Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 1 }); }
 function analyzeRace(race) {
-  return analyzeMarketOdds(race?.odds, race?.status);
+  return analyzeKeirinRace(race);
 }
 
 async function loadData({ initial = false } = {}) {
@@ -73,7 +73,10 @@ function renderLearning(status) {
   }));
   $("#weightUpdate").textContent = ready ? "許可" : "禁止";
   $("#weightUpdate").className = ready ? "allowed" : "denied";
-  $("#learningNote").textContent = status?.note || "検証状況を取得できません。";
+  const diagnostic = status?.diagnostics?.evaluableRaces
+    ? ` 診断${status.diagnostics.evaluableRaces}R：市場上位10点${status.diagnostics.marketTop10HitRate}% → 固定ハイブリッド${status.diagnostics.hybridTop10HitRate}%（重み更新には未使用）。`
+    : "";
+  $("#learningNote").textContent = `${status?.note || "検証状況を取得できません。"}${diagnostic}`;
 }
 
 function renderSummary() {
@@ -93,13 +96,13 @@ function renderSummary() {
 
 function renderRecommendations() {
   const ranked = dataset.venues.flatMap((venue) => venue.races.map((race) => ({ venue, race, analysis: analyzeRace(race) })))
-    .filter((item) => item.race.status === "OK")
+    .filter((item) => item.race.status === "OK" && item.analysis.modelReady)
     .sort((a, b) => (b.analysis.rankScore || 0) - (a.analysis.rankScore || 0) || a.race.number - b.race.number)
     .slice(0, 3);
   $("#recommendedGrid").replaceChildren(...ranked.map((item, position) => {
     const card = document.createElement("article");
     card.className = `recommend-card rank-${position + 1}`;
-    const tickets = item.analysis.tickets.slice(0, 3).map((ticket) => `<span>${ticket.combo} <b>${formatOdds(ticket.odds)}</b></span>`).join("");
+    const tickets = item.analysis.tickets.slice(0, 3).map((ticket) => `<span>${ticket.combo} <b>${formatOdds(ticket.odds)}倍 / ${formatOdds(ticket.modelProbability * 100)}%</b></span>`).join("");
     card.innerHTML = `<div class="recommend-rank"><b>${position + 1}</b><span>位</span></div><div class="recommend-body"><div class="race-card-top"><h3>${item.venue.name} ${item.race.number}R</h3><span class="index-badge">${item.analysis.grade} / ${item.analysis.index}</span></div><p>${item.analysis.scenario}</p><div class="mini-tickets">${tickets}</div><button type="button">このレースを見る</button></div>`;
     card.querySelector("button").onclick = () => { selectedVenueCode = item.venue.code; selectedRaceNumber = item.race.number; syncUrl(); renderAll(); scrollTo({ top: $("#raceDetail").offsetTop - 16, behavior: "smooth" }); };
     return card;
@@ -176,14 +179,17 @@ function renderRaceDetail() {
   }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 5; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
   const analysis = analyzeRace(race);
   $("#aiIndexValue").textContent = analysis.index ? `${analysis.grade} / ${analysis.index}` : "--";
-  $("#aiScenario").textContent = analysis.scenario;
+  $("#aiScenario").textContent = `${analysis.scenario}${analysis.modelReady ? ` データ取得率${analysis.dataRate}%・市場一致度${analysis.agreement}%・confidence ${analysis.confidence}%` : ""}`;
   $("#aiTenTickets").replaceChildren(...(analysis.tickets.length ? analysis.tickets.map((ticket, index) => {
     const item = document.createElement("div");
     item.className = "ten-ticket";
-    item.innerHTML = `<small>${index + 1}</small><b>${ticket.combo}</b><span>${formatOdds(ticket.odds)}倍</span>`;
+    const detail = ticket.modelProbability === null || ticket.modelProbability === undefined
+      ? `${formatOdds(ticket.odds)}倍`
+      : `${formatOdds(ticket.odds)}倍 / 予測${formatOdds(ticket.modelProbability * 100)}% / 市場${formatOdds(ticket.marketProbability * 100)}% / edge ${ticket.netEdge >= 0 ? "+" : ""}${formatOdds(ticket.netEdge)}%`;
+    item.innerHTML = `<small>${index + 1}</small><b>${ticket.combo}</b><span>${detail}</span>`;
     return item;
   }) : [Object.assign(document.createElement("div"), { className: "empty", textContent: "候補を表示できません。" })]));
-  $("#currentDecision").textContent = race?.status === "OK" ? "WATCH" : "DATA BLOCKED";
+  $("#currentDecision").textContent = race?.status === "OK" && analysis.modelReady ? "WATCH" : "DATA BLOCKED";
   const allOdds = Object.entries(race?.odds || {});
   const odds = [...allOdds].sort((a, b) => a[1] - b[1]).slice(0, 18);
   const oddsCard = ([combo, value]) => {

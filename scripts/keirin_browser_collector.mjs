@@ -46,12 +46,35 @@ async function extractBasic(tab) {
         prefecture: (detailMatch?.[1] || "").replace(/\s+/g, ""),
         class_history: detailMatch?.[2] || "",
         style: detailMatch?.[3] || "",
+        mark: cells[1] || "",
         raw_cells: cells,
       });
       seen.add(name);
       if (riders.length >= 9) break;
     }
+    riders.sort((a, b) => Number(a.number) - Number(b.number));
+    const performanceTable = keyTables.find((table) => table.flat().join(" ").includes("直近4ヶ月成績"));
+    const performanceRows = (performanceTable || []).filter((row) => /^\d{2,3}\.\d{1,2}$/.test(String(row?.[0] || "").trim()));
+    performanceRows.slice(0, riders.length).forEach((row, index) => {
+      const rates = String(row[3] || "").match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
+      const moves = String(row[1] || "").match(/\d+/g)?.map(Number) || [];
+      const bhs = String(row[2] || "").match(/\d+/g)?.map(Number) || [];
+      riders[index].performance = {
+        rating: Number(row[0]),
+        winRate: rates[0] ?? null,
+        top2Rate: rates[1] ?? null,
+        top3Rate: rates[2] ?? null,
+        escapeWins: moves[0] ?? null,
+        sprintWins: moves[1] ?? null,
+        passWins: moves[2] ?? null,
+        markWins: moves[3] ?? null,
+        backstretch: bhs[0] ?? null,
+        home: bhs[1] ?? null,
+        starts: bhs[2] ?? null,
+      };
+    });
     return {
+      race_number: raceMatch ? Number(raceMatch[1]) : null,
       race_class: raceMatch?.[2] || "",
       distance_m: raceMatch ? Number(raceMatch[3]) : null,
       riders,
@@ -147,10 +170,15 @@ export async function collectVenue(browser, venue, config) {
     if (!dateOption) throw new Error(`${config.monthDay} date tab not found`);
     await tab.playwright.locator(`#${dateOption.id}`).click();
     await waitForLocator(tab.playwright.locator('button[id^="hhRaceBtn"]'));
-    let raceIds = await tab.playwright.evaluate(() => Array.from(document.querySelectorAll('button[id^="hhRaceBtn"]')).filter((button) => !button.disabled && /^hhRaceBtn\d+$/.test(button.id)).map((button) => button.id));
-    raceIds = [...new Set(raceIds)].sort((a, b) => Number(a.replace(/\D/g, "")) - Number(b.replace(/\D/g, "")));
+    let raceOptions = await tab.playwright.evaluate(() => Array.from(document.querySelectorAll('button[id^="hhRaceBtn"]')).filter((button) => !button.disabled && /^hhRaceBtn\d+$/.test(button.id)).map((button) => ({
+      id: button.id,
+      startTime: (button.innerText || "").match(/\d{2}:\d{2}/)?.[0] || null,
+    })));
+    raceOptions = [...new Map(raceOptions.map((option) => [option.id, option])).values()]
+      .sort((a, b) => Number(a.id.replace(/\D/g, "")) - Number(b.id.replace(/\D/g, "")));
 
-    for (const raceId of raceIds) {
+    for (const raceOption of raceOptions) {
+      const raceId = raceOption.id;
       const raceNumber = Number(raceId.replace(/\D/g, ""));
       try {
         await tab.playwright.locator(`#${raceId}`).click();
@@ -160,7 +188,8 @@ export async function collectVenue(browser, venue, config) {
           await basicButton.click();
           await pause(130);
         }
-        const basic = await extractBasic(tab);
+        let basic = await extractBasic(tab);
+        if (basic.race_number && basic.race_number !== raceNumber) throw new Error(`race selection mismatch expected=${raceNumber} actual=${basic.race_number}`);
         const oddsButton = tab.playwright.locator("#rcbtn6");
         if (await oddsButton.count() !== 1) throw new Error("odds tab missing");
         // KEIRIN.JP sometimes leaves a transparent navigation layer above this
@@ -169,7 +198,27 @@ export async function collectVenue(browser, venue, config) {
         // as missing source data.
         await oddsButton.click({ force: true });
         await pause(320);
-        const oddsData = await extractOdds(tab);
+        let oddsData = await extractOdds(tab);
+        let preliminaryExpected = expectedOddsCount(oddsData.numbers.length || basic.riders.length);
+        if (Object.keys(oddsData.odds).length !== preliminaryExpected) {
+          await pause(700);
+          await oddsButton.click({ force: true });
+          await pause(320);
+          const retryOdds = await extractOdds(tab);
+          if (Object.keys(retryOdds.odds).length > Object.keys(oddsData.odds).length) oddsData = retryOdds;
+        }
+        const performanceCount = basic.riders.filter((rider) => Number.isFinite(Number(rider.performance?.rating))).length;
+        const expectedRiders = oddsData.numbers.length || basic.riders.length;
+        if ((basic.riders.length !== expectedRiders || performanceCount !== basic.riders.length) && await basicButton.count() === 1) {
+          await basicButton.click({ force: true });
+          await pause(400);
+          const retryBasic = await extractBasic(tab);
+          const basicQuality = (candidate) => candidate.riders.filter((rider) => rider.name).length
+            + candidate.riders.filter((rider) => Number.isFinite(Number(rider.performance?.rating))).length * 2;
+          if (basicQuality(retryBasic) > basicQuality(basic)) basic = retryBasic;
+          await oddsButton.click({ force: true });
+          await pause(320);
+        }
         const riderMap = new Map((basic.riders || []).filter((rider) => rider.number).map((rider) => [rider.number, rider]));
         const riderNumbers = oddsData.numbers.length
           ? oddsData.numbers
@@ -189,6 +238,7 @@ export async function collectVenue(browser, venue, config) {
           venue_code: venue.code,
           race_date: config.raceDate,
           race_number: raceNumber,
+          start_time: raceOption.startTime,
           race_class: basic.race_class,
           distance_m: basic.distance_m,
           riders,
@@ -243,7 +293,7 @@ export async function collectVenue(browser, venue, config) {
         }
       }
     }
-    return { venue: venue.name, races: raceIds.length, saved, blocked };
+    return { venue: venue.name, races: raceOptions.length, saved, blocked };
   } finally {
     await tab.close();
   }
