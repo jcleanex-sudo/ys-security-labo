@@ -1,4 +1,5 @@
 import { saveRaceRecord } from "./keirin_private_store.mjs";
+import { saveOfficialResult } from "./keirin_browser_result_collector.mjs";
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -184,7 +185,17 @@ export async function collectVenue(browser, venue, config) {
           extracted_at: new Date().toISOString(),
         };
         const destination = await saveRaceRecord(record, config.outputDirectory);
-        saved.push({ race: raceNumber, status, odds: oddsCount, expected, path: destination });
+        let resultStatus = "NOT_AVAILABLE";
+        if (config.collectResults === true) {
+          const resultButton = tab.playwright.locator("#rcbtn8");
+          if (await resultButton.count() === 1 && await resultButton.isEnabled()) {
+            await resultButton.click({ force: true });
+            await pause(250);
+            const resultRecord = await saveOfficialResult(tab, venue, { ...config, raceNumber });
+            resultStatus = resultRecord.status;
+          }
+        }
+        saved.push({ race: raceNumber, status, odds: oddsCount, expected, result: resultStatus, path: destination });
         if (status !== "OK") blocked.push({ race: raceNumber, reason: record.block_reason });
       } catch (error) {
         blocked.push({ race: raceNumber, reason: String(error?.message || error) });

@@ -4,3 +4,5 @@ private_keirin_data/
 __pycache__/
 *.pyc
 .tools/
+node_modules/
+keirin/data/collection.json

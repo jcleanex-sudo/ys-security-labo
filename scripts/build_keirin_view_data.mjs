@@ -13,6 +13,7 @@ const venueDirs = (await readdir(dailyRoot, { withFileTypes: true }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
 const venues = [];
+let permissionReference = "";
 for (const venueDir of venueDirs) {
   const venuePath = path.join(dailyRoot, venueDir.name);
   const raceDirs = (await readdir(venuePath, { withFileTypes: true }))
@@ -24,6 +25,7 @@ for (const venueDir of venueDirs) {
     const files = (await readdir(racePath)).filter((name) => name.endsWith(".json")).sort();
     if (!files.length) continue;
     const record = JSON.parse(await readFile(path.join(racePath, files.at(-1)), "utf8"));
+    permissionReference ||= String(record.permission_reference || "");
     const oddsKeys = Object.keys(record.odds || {});
     const oddsRiderNumbers = [...new Set(oddsKeys.flatMap((key) => key.split("-").map(Number)).filter(Number.isInteger))].sort((a, b) => a - b);
     races.push({
@@ -60,7 +62,7 @@ const payload = {
   schemaVersion: 1,
   raceDate: date,
   generatedAt: new Date().toISOString(),
-  permissionReference: "user-attested-2026-08-04",
+  permissionReference: permissionReference || "DATA BLOCKED",
   source: "KEIRIN.JP",
   notice: "許可済みデータから表示に必要な項目だけを整形。欠損値の推測補完はしていません。",
   venues,

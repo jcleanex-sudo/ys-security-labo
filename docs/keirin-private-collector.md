@@ -1,16 +1,16 @@
 # 競輪ローカル収集ツール
 
-このツールは、個人の検証用としてKEIRIN.JP公式ページを1回の実行につき1ページだけローカル保存します。公開サイト、GitHub Pages、GitHub Actionsとは接続しません。
+このツールは、個人の検証用としてKEIRIN.JP公式ページをローカル保存します。書面等で確認できる自動取得許可の参照が登録されている場合に限り、GitHub Actions版は当日の出走表・3連単オッズ・確定結果を取得し、検証済み表示用JSONだけをPagesへ配信します。
 
 ## 安全制限
 
 - 取得先は `https://keirin.jp/pc/` または `https://keirin.jp/sp/` 配下のみ
 - `robots.txt` を取得前に確認し、確認できない場合も `DATA BLOCKED`
 - 最短取得間隔は60秒、初期値は90秒
-- 再帰巡回、リンク追跡、並列取得、ログイン、投票操作は行わない
+- GitHub Actions版は当日開催だけを最大2場ずつ処理し、ログインや投票操作は行わない
 - 1回の応答は最大5MB
 - 保存先 `private_keirin_data/` は `.gitignore` でGit管理外
-- 取得データを公開サイトへ自動転送しない
+- 元取得データはGit管理・Pages成果物から除外し、整形・検証済みJSONだけを公開
 
 ## 使い方
 
@@ -44,7 +44,7 @@ python scripts/validate_keirin_race_export.py private_keirin_data/<UTC時刻>/ra
 
 出走車番から作れる3連単全組み合わせが1件でも欠ける、オッズが数値でない、許可参照がない、公開フラグが有効になっている場合は `DATA BLOCKED` になります。
 
-公開利用や自動定期実行は、権利者から書面で許可された条件を確認してから別途実装します。
+自動定期実行は `.github/workflows/keirin-auto-update.yml` で1日5回です。リポジトリ変数 `KEIRIN_PERMISSION_REFERENCE` が空なら `DATA BLOCKED` で停止します。許可条件が変わった場合は変数を削除し、定期実行を停止してください。
 
 ## 現在の取得状態
 

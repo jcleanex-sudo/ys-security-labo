@@ -6,5 +6,8 @@
     "test": "node --test tests/*.test.mjs",
     "validate:data": "python scripts/validate_data.py",
     "evaluate": "python scripts/evaluate_weights.py"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
   }
 }
