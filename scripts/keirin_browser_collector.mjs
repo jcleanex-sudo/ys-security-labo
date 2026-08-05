@@ -16,7 +16,7 @@ export const expectedOddsCount = (riderCount) => riderCount * (riderCount - 1) *
 
 async function extractBasic(tab) {
   return tab.playwright.evaluate(() => {
-    const bodyText = document.body.innerText || "";
+    const bodyText = document.body?.innerText || "";
     const raceMatch = bodyText.match(/\n(\d{1,2})R\s+([^\n]+?)\s+(\d+)m/);
     const tableRows = (table) => Array.from(table?.rows || []).map((row) =>
       Array.from(row.cells || []).map((cell) => (cell.innerText || "").trim().replace(/\s+/g, " ")),
@@ -85,7 +85,7 @@ async function extractBasic(tab) {
 
 async function extractOdds(tab) {
   const raw = await tab.playwright.evaluate(() => {
-    const bodyText = document.body.innerText || "";
+    const bodyText = document.body?.innerText || "";
     const oddsByFirst = {};
     const numbers = [];
     for (let number = 1; number <= 9; number += 1) {
