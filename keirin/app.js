@@ -1,18 +1,213 @@
-import { decide, netEdge, remainingMinutes } from "../core.js";
-import { buildKeirinFormation, keirinTicketEdge } from "./core.js";
+import { analyzeMarketOdds } from "./core.js?v=20260804-4";
 
-const VENUES=["函館","青森","いわき平","弥彦","前橋","取手","宇都宮","大宮","西武園","京王閣","立川","松戸","川崎","平塚","小田原","伊東温泉","静岡","名古屋","岐阜","大垣","豊橋","富山","松阪","四日市","福井","奈良","向日町","和歌山","岸和田","玉野","広島","防府","高松","小松島","高知","松山","小倉","久留米","武雄","佐世保","別府","熊本"];
-const STORE="keirin-edge-lab-races-v1";const $=(s)=>document.querySelector(s);let state=load();let activeKey="";
-const el={date:$("#raceDate"),venue:$("#venue"),race:$("#raceNumber"),rows:$("#riderRows"),decision:$("#decision"),main:$("#mainTickets"),cover:$("#coverTickets"),ranking:$("#rankingGrid"),skip:$("#skipList")};
-function load(){try{return JSON.parse(localStorage.getItem(STORE))||{}}catch{return{}}}function persist(){localStorage.setItem(STORE,JSON.stringify(state))}function today(){return new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(new Date())}function key(){return `${el.date.value}|${el.venue.value}|${el.race.value}`}function lines(v){return String(v||"").split(/\r?\n/).map(v=>v.trim()).filter(Boolean).slice(0,5)}
-function cls(s){return s==="UP"?"up":s==="DOWN"?"down":s==="WATCH"?"watch":"blocked"}function setStatus(n,s){n.textContent=s;n.className=cls(s)}function pct(v,d=1){return v!==""&&Number.isFinite(Number(v))?`${Number(v).toFixed(d)}%`:"--"}
-function addRider(r={}){if(el.rows.children.length>=9)return;const row=$("#riderTemplate").content.firstElementChild.cloneNode(true);row.querySelector('[data-field="number"]').value=r.number??"";row.querySelector('[data-field="name"]').value=r.name??"";row.querySelector('[data-field="style"]').value=r.style||"追";row.querySelector('[data-field="score"]').value=r.score??"";row.querySelector('[data-action="remove"]').onclick=()=>{row.remove();preview()};row.querySelectorAll("input,select").forEach(i=>i.addEventListener("input",preview));el.rows.append(row)}
-function riders(){return [...el.rows.children].map(row=>({number:Number(row.querySelector('[data-field="number"]').value),name:row.querySelector('[data-field="name"]').value.trim(),style:row.querySelector('[data-field="style"]').value,score:Number(row.querySelector('[data-field="score"]').value)})).filter(r=>r.number||r.name||r.score)}
-function fromForm(){return{date:el.date.value,venue:el.venue.value,race:Number(el.race.value),startTime:$("#startTime").value,observedAt:$("#observedAt").value,modelProbability:$("#modelProbability").value,marketProbability:$("#marketProbability").value,confidence:$("#confidence").value,agreement:$("#agreement").value,dataRate:$("#dataRate").value,costRate:$("#costRate").value,linePlan:$("#linePlan").value.trim(),reasons:lines($("#reasons").value),invalidConditions:$("#invalidConditions").value.trim(),riders:riders(),ticketOdds:state[activeKey]?.ticketOdds||{},savedAt:new Date().toISOString()}}
-function fill(r={}){$("#startTime").value=r.startTime||"";$("#observedAt").value=r.observedAt||"";for(const id of ["modelProbability","marketProbability","confidence","agreement","dataRate"])$("#"+id).value=r[id]??"";$("#costRate").value=r.costRate??"2";$("#linePlan").value=r.linePlan||"";$("#reasons").value=(r.reasons||[]).join("\n");$("#invalidConditions").value=r.invalidConditions||"";el.rows.replaceChildren();(r.riders?.length?r.riders:Array.from({length:7},()=>({}))).forEach(addRider)}
-function ticketRows(target,tickets,record){if(!tickets.length){target.innerHTML='<div class="empty">評価済み選手を5人以上入力してください</div>';return}const ranked=tickets.map(ticket=>{const odds=record.ticketOdds?.[ticket.join("-")]||"";return{ticket,odds,edge:keirinTicketEdge(record.riders||[],ticket,odds,record.costRate)}}).sort((a,b)=>(b.edge??-Infinity)-(a.edge??-Infinity));target.replaceChildren(...ranked.map(({ticket,odds,edge})=>{const row=document.createElement("div");row.className="ticket";row.innerHTML=`<div class="picks">${ticket.map(n=>`<b>${n}</b>`).join("")}</div><input type="number" min="1.1" step=".1" aria-label="${ticket.join("-")}の3連単オッズ" placeholder="オッズ" value="${odds}"><em>${edge===null?"edge --":`edge ${edge>=0?"+":""}${edge.toFixed(1)}%`}</em>`;row.querySelector("input").onchange=e=>{const current=state[activeKey]||fromForm();current.ticketOdds||={};current.ticketOdds[ticket.join("-")]=e.target.value;state[activeKey]=current;persist();render(current)};return row}))}
-function renderTickets(r){const f=buildKeirinFormation(r.riders||[]);ticketRows(el.main,f.main,r);ticketRows(el.cover,f.cover,r)}function preview(){renderTickets(fromForm())}
-function render(r={}){const result=decide(r);setStatus(el.decision,result.status);$("#modelValue").textContent=pct(r.modelProbability);$("#marketValue").textContent=pct(r.marketProbability);const edge=netEdge(r.modelProbability,r.marketProbability,r.costRate);$("#edgeValue").textContent=edge===null?"--":`${edge>=0?"+":""}${edge.toFixed(1)}%`;$("#confidenceValue").textContent=pct(r.confidence,0);$("#agreementValue").textContent=pct(r.agreement,0);const rem=remainingMinutes(r.date,r.startTime);$("#remainingValue").textContent=rem===null?"--":rem<0?"発走済":`${Math.floor(rem)}分`;renderTickets(r);dashboard()}
-function openRace(){activeKey=key();const r=state[activeKey]||{date:el.date.value,venue:el.venue.value,race:Number(el.race.value),ticketOdds:{}};fill(r);render(r);history.replaceState(null,"",`?date=${encodeURIComponent(el.date.value)}&venue=${encodeURIComponent(el.venue.value)}&race=${el.race.value}#review`)}
-function dashboard(){const records=Object.values(state).filter(r=>r.date===el.date.value);const assessed=records.map(record=>({record,result:decide(record),edge:netEdge(record.modelProbability,record.marketProbability,record.costRate)}));const eligible=assessed.filter(x=>["UP","DOWN"].includes(x.result.status)).sort((a,b)=>(b.edge??-999)-(a.edge??-999));el.ranking.replaceChildren(...(eligible.length?eligible.map((x,i)=>{const a=document.createElement("article");a.className="rank-card";a.innerHTML=`<div class="rank-top"><span>#${i+1}</span><b class="${cls(x.result.status)}">${x.result.status} · ${x.result.reason}</b></div><h3>${x.record.venue} ${x.record.race}R</h3><p>${x.record.linePlan||x.record.reasons?.[0]||"ライン未入力"}</p><div class="rank-score"><strong>${x.edge?.toFixed(1)}%</strong><span>confidence ${x.record.confidence}%</span></div>`;return a}):[Object.assign(document.createElement("div"),{className:"empty",textContent:"安全基準を通過したレースはありません。見送りを維持します。"})]));const skips=assessed.filter(x=>["WATCH","DATA BLOCKED"].includes(x.result.status));el.skip.innerHTML=skips.length?`<div class="skip-list">${skips.map(x=>`<div class="skip-item"><span>${x.record.venue} ${x.record.race}R</span><b>${x.result.status} · ${x.result.reason}</b></div>`).join("")}</div>`:'<div class="empty">登録済みの見送り対象はありません</div>';const complete=assessed.filter(x=>Number(x.record.dataRate)>=95).length;$("#coverage").textContent=records.length?`${Math.round(complete/records.length*100)}%`:"0%";$("#raceCount").textContent=records.length;const strict=eligible.filter(x=>Number(x.record.confidence)>=70).length,experimental=eligible.filter(x=>Number(x.record.confidence)>=60&&Number(x.record.confidence)<70).length;$("#strictCount").textContent=strict;$("#experimentalCount").textContent=experimental;const global=eligible.length?"UP":records.length?"WATCH":"DATA BLOCKED";setStatus($("#globalStatus"),global);setStatus($("#rankingStatus"),global)}
-VENUES.forEach(v=>el.venue.add(new Option(v,v)));for(let i=1;i<=12;i++)el.race.add(new Option(`${i}R`,String(i)));const q=new URLSearchParams(location.search);el.date.value=q.get("date")||today();el.venue.value=q.get("venue")||"平塚";el.race.value=q.get("race")||"1";$("#raceSelector").onsubmit=e=>{e.preventDefault();openRace()};$("#manualForm").onsubmit=e=>{e.preventDefault();const r=fromForm();state[activeKey]=r;persist();render(r)};$("#addRider").onclick=()=>addRider();$("#clearRace").onclick=()=>{if(confirm("このレースの端末内入力を消去しますか？")){delete state[activeKey];persist();openRace()}};$("#shareButton").onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$("#shareButton").textContent="コピー済み"}catch{prompt("共有URL",location.href)}setTimeout(()=>$("#shareButton").textContent="共有URL",1500)};openRace();setInterval(()=>render(state[activeKey]||fromForm()),60000);
+const $ = (selector) => document.querySelector(selector);
+let dataset = { venues: [], raceDate: "" };
+let selectedVenueCode = "";
+let selectedRaceNumber = 1;
+let isRefreshing = false;
+const AUTO_REFRESH_MS = 60_000;
+function selectedVenue() { return dataset.venues.find((venue) => venue.code === selectedVenueCode); }
+function selectedRace() { return selectedVenue()?.races.find((race) => race.number === selectedRaceNumber); }
+function fmtDate(value) { return value ? value.replaceAll("-", "/") : "--"; }
+function formatOdds(value) { return Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 1 }); }
+function analyzeRace(race) {
+  return analyzeMarketOdds(race?.odds, race?.status);
+}
+
+async function loadData({ initial = false } = {}) {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  try {
+    const cacheBuster = `t=${Date.now()}`;
+    const [response, learningResponse] = await Promise.all([
+      fetch(`./data/today.json?${cacheBuster}`, { cache: "no-store" }),
+      fetch(`./data/learning.json?${cacheBuster}`, { cache: "no-store" }),
+    ]);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    dataset = await response.json();
+    if (learningResponse.ok) renderLearning(await learningResponse.json());
+    $("#raceDate").value = dataset.raceDate;
+    if (initial || !selectedVenueCode) {
+      const query = new URLSearchParams(location.search);
+      selectedVenueCode = query.get("venue") || dataset.venues[0]?.code || "";
+      selectedRaceNumber = Number(query.get("race")) || selectedVenue()?.races[0]?.number || 1;
+    }
+    if (!selectedVenue()) selectedVenueCode = dataset.venues[0]?.code || "";
+    if (!selectedRace()) selectedRaceNumber = selectedVenue()?.races[0]?.number || 1;
+    renderAll();
+    const updatedAt = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+    $("#sourceBadge").textContent = `${fmtDate(dataset.raceDate)} / ${dataset.source}・自動更新 ${updatedAt}`;
+  } catch (error) {
+    $("#sourceBadge").textContent = "DATA BLOCKED";
+    $("#blockedMessage").textContent = `表示データを読み込めません: ${error.message}`;
+    $("#mobileStatus").textContent = "DATA BLOCKED";
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+function renderLearning(status) {
+  const ready = status?.weightUpdateAllowed === true;
+  $("#learningStatus").textContent = ready ? "READY" : "DATA BLOCKED";
+  $("#learningStatus").className = `status ${ready ? "ok" : "blocked"}`;
+  $("#learningSnapshots").textContent = `${status?.snapshots ?? 0}件`;
+  $("#learningCompleteness").textContent = `${status?.completeLatest ?? 0}/${status?.uniqueRaces ?? 0}R (${status?.dataCompleteness ?? 0}%)`;
+  $("#learningLabels").textContent = `${status?.labeledResults ?? 0}/${status?.limits?.minimumLabeledResults ?? 200}件`;
+  $("#learningDays").textContent = `${status?.observedDays ?? 0}/${status?.limits?.minimumObservedDays ?? 60}日`;
+  const labels = {
+    dataCompleteness: "データ完全性 95%以上",
+    labeledResults: "結果ラベル 200件以上",
+    observedDays: "検証期間 60日以上",
+    chronologicalSplit: "未来情報を混ぜない時系列分割",
+    profitFactor: "利益係数 1.05以上",
+    maximumDrawdown: "最大ドローダウン 20%以下",
+    confidenceInterval95: "95%信頼区間を算出",
+  };
+  const failed = new Set(status?.failedGates || []);
+  $("#learningGates").replaceChildren(...Object.entries(labels).map(([key, label]) => {
+    const row = document.createElement("div");
+    const passed = !failed.has(key);
+    row.className = passed ? "gate-pass" : "gate-blocked";
+    row.innerHTML = `<span>${passed ? "✓" : "—"}</span><b>${label}</b><em>${passed ? "通過" : "未達"}</em>`;
+    return row;
+  }));
+  $("#weightUpdate").textContent = ready ? "許可" : "禁止";
+  $("#weightUpdate").className = ready ? "allowed" : "denied";
+  $("#learningNote").textContent = status?.note || "検証状況を取得できません。";
+}
+
+function renderSummary() {
+  const races = dataset.venues.flatMap((venue) => venue.races);
+  const ready = races.filter((race) => race.status === "OK").length;
+  const blocked = races.length - ready;
+  $("#venueCount").textContent = `${dataset.venues.length}場`;
+  $("#raceCount").textContent = `${races.length}R`;
+  $("#availableCount").textContent = `${ready}R`;
+  $("#summaryVenues").textContent = dataset.venues.length;
+  $("#summaryRaces").textContent = races.length;
+  $("#summaryReady").textContent = ready;
+  $("#summaryBlocked").textContent = blocked;
+  $("#sourceBadge").textContent = `${fmtDate(dataset.raceDate)} / ${dataset.source}`;
+  $("#mobileStatus").textContent = `${ready}/${races.length}R 取得済み`;
+}
+
+function renderRecommendations() {
+  const ranked = dataset.venues.flatMap((venue) => venue.races.map((race) => ({ venue, race, analysis: analyzeRace(race) })))
+    .filter((item) => item.race.status === "OK")
+    .sort((a, b) => (b.analysis.rankScore || 0) - (a.analysis.rankScore || 0) || a.race.number - b.race.number)
+    .slice(0, 3);
+  $("#recommendedGrid").replaceChildren(...ranked.map((item, position) => {
+    const card = document.createElement("article");
+    card.className = `recommend-card rank-${position + 1}`;
+    const tickets = item.analysis.tickets.slice(0, 3).map((ticket) => `<span>${ticket.combo} <b>${formatOdds(ticket.odds)}</b></span>`).join("");
+    card.innerHTML = `<div class="recommend-rank"><b>${position + 1}</b><span>位</span></div><div class="recommend-body"><div class="race-card-top"><h3>${item.venue.name} ${item.race.number}R</h3><span class="index-badge">${item.analysis.grade} / ${item.analysis.index}</span></div><p>${item.analysis.scenario}</p><div class="mini-tickets">${tickets}</div><button type="button">このレースを見る</button></div>`;
+    card.querySelector("button").onclick = () => { selectedVenueCode = item.venue.code; selectedRaceNumber = item.race.number; syncUrl(); renderAll(); scrollTo({ top: $("#raceDetail").offsetTop - 16, behavior: "smooth" }); };
+    return card;
+  }));
+}
+
+function renderVenueTabs() {
+  const host = $("#venueTabs");
+  host.replaceChildren(...dataset.venues.map((venue) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = venue.name;
+    button.className = venue.code === selectedVenueCode ? "active" : "";
+    button.onclick = () => {
+      selectedVenueCode = venue.code;
+      selectedRaceNumber = venue.races[0]?.number || 1;
+      syncUrl(); renderAll();
+    };
+    return button;
+  }));
+}
+
+function renderRaceTabs() {
+  const host = $("#raceTabs");
+  const races = selectedVenue()?.races || [];
+  host.replaceChildren(...races.map((race) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `${race.number}R`;
+    button.className = `${race.number === selectedRaceNumber ? "active " : ""}${race.status === "OK" ? "ok-dot" : "blocked-dot"}`;
+    button.onclick = () => { selectedRaceNumber = race.number; syncUrl(); renderAll(); };
+    return button;
+  }));
+}
+
+function renderRaceDetail() {
+  const venue = selectedVenue();
+  const race = selectedRace();
+  $("#selectedVenue").textContent = venue?.name || "--";
+  $("#selectedRace").textContent = `${race?.number ?? "--"}R`;
+  const status = race?.status || "DATA BLOCKED";
+  $("#raceStatus").textContent = status;
+  $("#raceStatus").className = `status ${status === "OK" ? "ok" : "blocked"}`;
+  const ready = status === "OK";
+  $("#blockedMessage").className = `alert blocked-alert${ready ? " ready" : ""}`;
+  $("#blockedMessage").textContent = ready
+    ? "三連単オッズの組合せ数を検証済みです。手動評価を入力するとnet edgeを計算できます。"
+    : `DATA BLOCKED：${race?.blockReason || "公式データが未提供または不完全です。"}`;
+  $("#riderNumbers").textContent = race?.riderNumbers?.length ? race.riderNumbers.join("・") : "未取得";
+  $("#oddsCompleteness").textContent = `${race?.oddsCount ?? 0} / ${race?.expectedOddsCount ?? "--"}`;
+  $("#oddsUpdated").textContent = race?.oddsUpdatedAt || "--";
+  $("#raceClass").textContent = race?.raceClass || "クラス未取得";
+  $("#raceDistance").textContent = race?.distanceM ? `${race.distanceM}m` : "距離未取得";
+  $("#raceAlignment").textContent = race?.alignment || "未取得";
+  const riders = [...(race?.riders || [])].sort((a, b) => a.number - b.number);
+  $("#raceEntries").replaceChildren(...(riders.length ? riders.map((rider) => {
+    const row = document.createElement("tr");
+    const numberCell = document.createElement("td");
+    const numberBadge = document.createElement("b");
+    numberBadge.className = `rider-number number-${rider.number}`;
+    numberBadge.textContent = rider.number;
+    numberCell.append(numberBadge);
+    const values = [rider.name, rider.prefecture, rider.classHistory, rider.style];
+    row.append(numberCell, ...values.map((value, index) => {
+      const cell = document.createElement("td");
+      if (index === 0) {
+        const strong = document.createElement("strong");
+        strong.textContent = value || "--";
+        cell.append(strong);
+      } else cell.textContent = value || "--";
+      return cell;
+    }));
+    return row;
+  }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 5; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
+  const analysis = analyzeRace(race);
+  $("#aiIndexValue").textContent = analysis.index ? `${analysis.grade} / ${analysis.index}` : "--";
+  $("#aiScenario").textContent = analysis.scenario;
+  $("#aiTenTickets").replaceChildren(...(analysis.tickets.length ? analysis.tickets.map((ticket, index) => {
+    const item = document.createElement("div");
+    item.className = "ten-ticket";
+    item.innerHTML = `<small>${index + 1}</small><b>${ticket.combo}</b><span>${formatOdds(ticket.odds)}倍</span>`;
+    return item;
+  }) : [Object.assign(document.createElement("div"), { className: "empty", textContent: "候補を表示できません。" })]));
+  $("#currentDecision").textContent = race?.status === "OK" ? "WATCH" : "DATA BLOCKED";
+  const allOdds = Object.entries(race?.odds || {});
+  const odds = [...allOdds].sort((a, b) => a[1] - b[1]).slice(0, 18);
+  const oddsCard = ([combo, value]) => {
+    const item = document.createElement("div");
+    item.className = "odd-card";
+    const combination = document.createElement("span");
+    const price = document.createElement("b");
+    combination.textContent = combo;
+    price.textContent = formatOdds(value);
+    item.append(combination, price);
+    return item;
+  };
+  $("#popularOdds").replaceChildren(...(odds.length ? odds.map(oddsCard) : [Object.assign(document.createElement("div"), { className: "empty", textContent: "オッズ未取得のため表示できません。" })]));
+  $("#allOddsCount").textContent = allOdds.length;
+  $("#allOdds").replaceChildren(...allOdds.sort((a, b) => a[0].localeCompare(b[0], "ja", { numeric: true })).map(oddsCard));
+}
+
+function syncUrl() { history.replaceState(null, "", `?venue=${encodeURIComponent(selectedVenueCode)}&race=${selectedRaceNumber}#today`); }
+function renderAll() { renderSummary(); renderRecommendations(); renderVenueTabs(); renderRaceTabs(); renderRaceDetail(); }
+
+$("#raceDate").onchange = () => { if ($("#raceDate").value !== dataset.raceDate) alert("現在保存されている取得日は " + dataset.raceDate + " です。"); $("#raceDate").value = dataset.raceDate; };
+$("#shareButton").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("#shareButton").textContent = "コピー済み"; } catch { prompt("共有URL", location.href); } };
+
+loadData({ initial: true });
+setInterval(() => loadData(), AUTO_REFRESH_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) loadData(); });
+window.addEventListener("online", () => loadData());

@@ -1,0 +1,6 @@
+private_keirin_data/
+*.local.html
+*.local.json
+__pycache__/
+*.pyc
+.tools/

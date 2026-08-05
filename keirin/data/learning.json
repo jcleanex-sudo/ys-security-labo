@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-08-05T00:06:08.662Z",
+  "status": "DATA BLOCKED",
+  "snapshots": 239,
+  "parsedSnapshots": 239,
+  "resultSnapshots": 1,
+  "uniqueRaces": 164,
+  "completeLatest": 164,
+  "labeledResults": 1,
+  "observedDays": 2,
+  "dataCompleteness": 100,
+  "chronologicalSplit": false,
+  "profitFactor": null,
+  "maximumDrawdown": null,
+  "confidenceInterval95": null,
+  "weightUpdateAllowed": false,
+  "failedGates": [
+    "labeledResults",
+    "observedDays",
+    "chronologicalSplit",
+    "profitFactor",
+    "maximumDrawdown",
+    "confidenceInterval95"
+  ],
+  "limits": {
+    "minimumLabeledResults": 200,
+    "minimumObservedDays": 60,
+    "minimumDataCompleteness": 95,
+    "minimumProfitFactor": 1.05,
+    "maximumDrawdown": 20
+  },
+  "note": "結果ラベルと検証期間が不足しているため、重みは更新していません。"
+}

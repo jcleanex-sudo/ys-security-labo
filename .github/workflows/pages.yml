@@ -1,4 +1,4 @@
-name: Deploy KEIBA EDGE LAB to Pages
+name: Deploy standalone KEIRIN EDGE LAB to Pages
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: keiba-pages
+  group: keirin-pages
   cancel-in-progress: true
 
 jobs:
@@ -27,14 +27,14 @@ jobs:
           python-version: "3.12"
       - name: Test calculations
         run: npm test
-      - name: Validate approved data only
-        run: python scripts/validate_data.py
-      - name: Run chronological safety evaluation
-        run: python scripts/evaluate_weights.py
       - name: Build static artifact
         run: |
           mkdir _site
-          cp -R index.html style.css app.js core.js data keirin _site/
+          cp -R keirin/. _site/
+          test -f _site/index.html
+          test -f _site/app.js
+          test -f _site/core.js
+          test -f _site/data/today.json
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildKeirinFormation, keirinTicketEdge, orderedChance } from "../keirin/core.js";
+import { analyzeMarketOdds, buildKeirinFormation, keirinTicketEdge, orderedChance } from "../keirin/core.js";
 
 const riders = [
   { number: 1, score: 40 },
@@ -27,4 +27,16 @@ test("keirin ordered chance uses the remaining rider pool", () => {
 
 test("keirin ticket edge stays blocked until odds are entered", () => {
   assert.equal(keirinTicketEdge(riders, [1, 2, 3], "", 2), null);
+});
+
+test("market analysis returns an index and ten candidates", () => {
+  const odds = {};
+  let value = 5;
+  for (const first of [1, 2, 3, 4, 5]) for (const second of [1, 2, 3, 4, 5]) for (const third of [1, 2, 3, 4, 5]) {
+    if (new Set([first, second, third]).size === 3) odds[`${first}-${second}-${third}`] = value++;
+  }
+  const result = analyzeMarketOdds(odds, "OK");
+  assert.ok(result.index > 0 && result.index <= 99);
+  assert.equal(result.tickets.length, 10);
+  assert.match(result.scenario, /1着軸/);
 });
