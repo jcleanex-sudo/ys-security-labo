@@ -50,7 +50,11 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Verify permission gate
-        run: test -n "$KEIRIN_PERMISSION_REFERENCE" || { echo "DATA BLOCKED: permission reference missing"; exit 1; }
+        run: |
+          test -n "$KEIRIN_PERMISSION_REFERENCE" || {
+            echo "DATA BLOCKED: permission reference missing"
+            exit 1
+          }
       - name: Collect official daily data
         run: node scripts/collect_keirin_playwright.mjs
       - name: Run safety tests
