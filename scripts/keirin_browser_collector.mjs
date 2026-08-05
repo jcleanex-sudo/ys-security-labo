@@ -12,6 +12,20 @@ async function waitForLocator(locator, timeoutMilliseconds = 15_000) {
   throw new Error("page transition timed out");
 }
 
+async function waitForRaceNumber(tab, expectedRaceNumber, timeoutMilliseconds = 12_000) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  let observedRaceNumber = null;
+  while (Date.now() < deadline) {
+    observedRaceNumber = await tab.playwright.evaluate(() => {
+      const match = (document.body?.innerText || "").match(/\n(\d{1,2})R\s+[^\n]+?\s+\d+m/);
+      return match ? Number(match[1]) : null;
+    });
+    if (observedRaceNumber === expectedRaceNumber) return;
+    await pause(200);
+  }
+  throw new Error(`race selection timed out expected=${expectedRaceNumber} actual=${observedRaceNumber ?? "none"}`);
+}
+
 export const expectedOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2);
 
 async function extractBasic(tab) {
@@ -182,16 +196,15 @@ export async function collectVenue(browser, venue, config) {
       const raceNumber = Number(raceId.replace(/\D/g, ""));
       try {
         await tab.playwright.locator(`#${raceId}`).click();
-        await pause(320);
+        await waitForRaceNumber(tab, raceNumber);
         const basicButton = tab.playwright.locator("#rcbtn1");
-        if (await basicButton.count() === 1) {
-          await basicButton.click();
-          await pause(130);
-        }
+        await waitForLocator(basicButton);
+        await basicButton.click();
+        await pause(220);
         let basic = await extractBasic(tab);
         if (basic.race_number && basic.race_number !== raceNumber) throw new Error(`race selection mismatch expected=${raceNumber} actual=${basic.race_number}`);
         const oddsButton = tab.playwright.locator("#rcbtn6");
-        if (await oddsButton.count() !== 1) throw new Error("odds tab missing");
+        await waitForLocator(oddsButton);
         // KEIRIN.JP sometimes leaves a transparent navigation layer above this
         // already-verified, unique tab button. A forced click targets only the
         // confirmed #rcbtn6 element and avoids treating that presentation layer
