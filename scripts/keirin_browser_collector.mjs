@@ -3,6 +3,15 @@ import { saveOfficialResult } from "./keirin_browser_result_collector.mjs";
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+async function waitForLocator(locator, timeoutMilliseconds = 15_000) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    if (await locator.count() > 0) return;
+    await pause(200);
+  }
+  throw new Error("page transition timed out");
+}
+
 export const expectedOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2);
 
 async function extractBasic(tab) {
@@ -123,12 +132,12 @@ export async function collectVenue(browser, venue, config) {
     const eventLink = tab.playwright.locator(`a[data-pprm-href="/pc/racelist"][data-pprm-encp="${event.encp}"]`);
     if (await eventLink.count() !== 1) throw new Error("event link not unique");
     await eventLink.click();
-    await pause(300);
+    await waitForLocator(tab.playwright.locator('a[name="hhlnkRaceDate"]'));
     const dateOptions = await tab.playwright.evaluate(() => Array.from(document.querySelectorAll('a[name="hhlnkRaceDate"]')).map((anchor) => ({ id: anchor.id, text: anchor.textContent.trim() })));
     const dateOption = dateOptions.find((item) => item.text.startsWith(config.monthDay));
     if (!dateOption) throw new Error(`${config.monthDay} date tab not found`);
     await tab.playwright.locator(`#${dateOption.id}`).click();
-    await pause(200);
+    await waitForLocator(tab.playwright.locator('button[id^="hhRaceBtn"]'));
     let raceIds = await tab.playwright.evaluate(() => Array.from(document.querySelectorAll('button[id^="hhRaceBtn"]')).filter((button) => !button.disabled && /^hhRaceBtn\d+$/.test(button.id)).map((button) => button.id));
     raceIds = [...new Set(raceIds)].sort((a, b) => Number(a.replace(/\D/g, "")) - Number(b.replace(/\D/g, "")));
 
