@@ -139,6 +139,22 @@ async function extractOdds(tab) {
   };
 }
 
+async function extractOddsUntilComplete(tab, oddsButton, timeoutMilliseconds = 6_000) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  let best = await extractOdds(tab);
+  while (Date.now() < deadline) {
+    const oddsCount = Object.keys(best.odds).length;
+    const expected = expectedOddsCount(best.numbers.length);
+    if (expected > 0 && oddsCount === expected) return best;
+    await pause(350);
+    await oddsButton.click({ force: true });
+    await pause(250);
+    const candidate = await extractOdds(tab);
+    if (Object.keys(candidate.odds).length > oddsCount || candidate.numbers.length > best.numbers.length) best = candidate;
+  }
+  return best;
+}
+
 export async function collectVenue(browser, venue, config) {
   const tab = await browser.tabs.new();
   const saved = [];
@@ -211,15 +227,7 @@ export async function collectVenue(browser, venue, config) {
         // as missing source data.
         await oddsButton.click({ force: true });
         await pause(320);
-        let oddsData = await extractOdds(tab);
-        let preliminaryExpected = expectedOddsCount(oddsData.numbers.length || basic.riders.length);
-        if (Object.keys(oddsData.odds).length !== preliminaryExpected) {
-          await pause(700);
-          await oddsButton.click({ force: true });
-          await pause(320);
-          const retryOdds = await extractOdds(tab);
-          if (Object.keys(retryOdds.odds).length > Object.keys(oddsData.odds).length) oddsData = retryOdds;
-        }
+        let oddsData = await extractOddsUntilComplete(tab, oddsButton);
         const performanceCount = basic.riders.filter((rider) => Number.isFinite(Number(rider.performance?.rating))).length;
         const expectedRiders = oddsData.numbers.length || basic.riders.length;
         if ((basic.riders.length !== expectedRiders || performanceCount !== basic.riders.length) && await basicButton.count() === 1) {
