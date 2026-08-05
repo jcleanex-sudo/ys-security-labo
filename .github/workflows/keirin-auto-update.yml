@@ -1,0 +1,80 @@
+name: Auto-update KEIRIN data and Pages
+
+on:
+  schedule:
+    # 08:10, 11:10, 14:10, 17:10 and 23:10 JST
+    - cron: "10 2,5,8,14,23 * * *"
+  workflow_dispatch:
+    inputs:
+      race_date:
+        description: Optional race date (YYYY-MM-DD, JST)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: keirin-auto-pages
+  cancel-in-progress: true
+
+jobs:
+  collect-test-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    env:
+      KEIRIN_PERMISSION_REFERENCE: ${{ vars.KEIRIN_PERMISSION_REFERENCE }}
+      RACE_DATE: ${{ inputs.race_date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: keiba-site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore private validation history
+        uses: actions/cache/restore@v4
+        with:
+          path: private_keirin_data
+          key: keirin-private-${{ github.run_id }}
+          restore-keys: keirin-private-
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify permission gate
+        run: test -n "$KEIRIN_PERMISSION_REFERENCE" || { echo "DATA BLOCKED: permission reference missing"; exit 1; }
+      - name: Collect official daily data
+        run: node scripts/collect_keirin_playwright.mjs
+      - name: Run safety tests
+        run: |
+          npm test
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Save private validation history
+        uses: actions/cache/save@v4
+        with:
+          path: private_keirin_data
+          key: keirin-private-${{ github.run_id }}
+      - name: Build static artifact
+        run: |
+          mkdir _site
+          cp -R keirin/. _site/
+          test -f _site/data/today.json
+          test -f _site/data/learning.json
+          test -f _site/data/collection.json
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
