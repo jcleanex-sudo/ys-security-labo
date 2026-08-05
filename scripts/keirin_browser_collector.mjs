@@ -118,7 +118,12 @@ export async function collectVenue(browser, venue, config) {
         const startDay = dayCursor;
         const endDay = dayCursor + span - 1;
         const anchor = cell.querySelector('a[data-pprm-href="/pc/racelist"]');
-        if (anchor) links.push({ startDay, endDay, encp: anchor.getAttribute("data-pprm-encp") });
+        if (anchor) links.push({
+          startDay,
+          endDay,
+          encp: anchor.getAttribute("data-pprm-encp"),
+          disp: anchor.getAttribute("data-pprm-dkbn") === "2" ? "PJ0302" : "PJ0301",
+        });
         dayCursor += span;
       }
       return {
@@ -131,7 +136,11 @@ export async function collectVenue(browser, venue, config) {
     if (!event) throw new Error("current event link not found");
     const eventLink = tab.playwright.locator(`a[data-pprm-href="/pc/racelist"][data-pprm-encp="${event.encp}"]`);
     if (await eventLink.count() !== 1) throw new Error("event link not unique");
-    await eventLink.click();
+    if (typeof tab.postNavigation === "function") {
+      await tab.postNavigation("/pc/racelist", { encp: event.encp, disp: event.disp });
+    } else {
+      await eventLink.click();
+    }
     await waitForLocator(tab.playwright.locator('a[name="hhlnkRaceDate"]'));
     const dateOptions = await tab.playwright.evaluate(() => Array.from(document.querySelectorAll('a[name="hhlnkRaceDate"]')).map((anchor) => ({ id: anchor.id, text: anchor.textContent.trim() })));
     const dateOption = dateOptions.find((item) => item.text.startsWith(config.monthDay));

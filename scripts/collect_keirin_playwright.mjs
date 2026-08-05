@@ -25,6 +25,23 @@ export function createBrowserAdapter(playwrightBrowser) {
         return {
           playwright: page,
           goto: (url) => page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 }),
+          postNavigation: (action, params) => Promise.all([
+            page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60_000 }),
+            page.evaluate(({ action, params }) => {
+              const form = document.createElement("form");
+              form.action = action;
+              form.method = "post";
+              for (const [name, value] of Object.entries(params)) {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = name;
+                input.value = value;
+                form.append(input);
+              }
+              document.body.append(form);
+              form.submit();
+            }, { action, params }),
+          ]),
           url: async () => page.url(),
           close: () => page.close(),
         };
