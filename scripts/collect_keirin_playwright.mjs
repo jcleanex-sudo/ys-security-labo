@@ -98,18 +98,19 @@ async function main() {
     await browser.close();
   }
 
+  const discoveredRaces = results.reduce((sum, venue) => sum + venue.races, 0);
   const collectedRaces = results.reduce((sum, venue) => sum + venue.saved.length, 0);
   if (!collectedRaces) throw new Error("DATA BLOCKED: no races were saved");
   execFileSync(process.execPath, ["scripts/audit_keirin_daily.mjs", date.raceDate, outputDirectory], { stdio: "inherit" });
   const audit = JSON.parse(await readFile(path.join(outputDirectory, "audit", `${date.raceDate}.json`), "utf8"));
-  if (audit.invalid > 0 || audit.races !== collectedRaces) {
-    throw new Error(`DATA BLOCKED: audit failed invalid=${audit.invalid} audited=${audit.races} collected=${collectedRaces}`);
+  if (audit.invalid > 0 || audit.races !== collectedRaces || collectedRaces !== discoveredRaces) {
+    throw new Error(`DATA BLOCKED: audit failed invalid=${audit.invalid} audited=${audit.races} collected=${collectedRaces} discovered=${discoveredRaces}`);
   }
   execFileSync(process.execPath, ["scripts/build_keirin_view_data.mjs", date.raceDate, outputDirectory, "keirin/data/today.json"], { stdio: "inherit" });
   execFileSync(process.execPath, ["scripts/build_keirin_learning_status.mjs", outputDirectory, "keirin/data/learning.json"], { stdio: "inherit" });
   const summary = {
     generatedAt: new Date().toISOString(), raceDate: date.raceDate,
-    venues: results.length, races: collectedRaces,
+    venues: results.length, races: discoveredRaces, saved: collectedRaces,
     ok: results.reduce((sum, venue) => sum + venue.saved.filter((race) => race.status === "OK").length, 0),
     blocked: results.reduce((sum, venue) => sum + venue.blocked.length, 0),
     results: results.reduce((sum, venue) => sum + venue.saved.filter((race) => race.result === "OK").length, 0),

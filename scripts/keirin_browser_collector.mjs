@@ -216,7 +216,31 @@ export async function collectVenue(browser, venue, config) {
         saved.push({ race: raceNumber, status, odds: oddsCount, expected, result: resultStatus, path: destination });
         if (status !== "OK") blocked.push({ race: raceNumber, reason: record.block_reason });
       } catch (error) {
-        blocked.push({ race: raceNumber, reason: String(error?.message || error) });
+        const reason = String(error?.message || error);
+        blocked.push({ race: raceNumber, reason });
+        try {
+          const destination = await saveRaceRecord({
+            status: "DATA BLOCKED",
+            block_reason: reason,
+            scope: "PRIVATE_LOCAL_ONLY",
+            publication_allowed: false,
+            permission_reference: config.permissionReference,
+            source_url: await tab.url(),
+            venue: venue.name,
+            venue_code: venue.code,
+            race_date: config.raceDate,
+            race_number: raceNumber,
+            riders: [],
+            odds_type: "trifecta",
+            odds: {},
+            odds_count: 0,
+            expected_odds_count: 0,
+            extracted_at: new Date().toISOString(),
+          }, config.outputDirectory);
+          saved.push({ race: raceNumber, status: "DATA BLOCKED", odds: 0, expected: 0, result: "NOT_AVAILABLE", path: destination });
+        } catch (saveError) {
+          blocked[blocked.length - 1].reason = `${reason}; blocked-record save failed: ${String(saveError?.message || saveError)}`;
+        }
       }
     }
     return { venue: venue.name, races: raceIds.length, saved, blocked };
