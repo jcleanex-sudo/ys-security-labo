@@ -7,7 +7,7 @@ export type Candle = {
   volume: number;
 };
 
-export type StrategyKind = 'maCross' | 'rsiReversal' | 'macdCross' | 'bbReversal' | 'breakout';
+export type StrategyKind = 'maCross' | 'rsiReversal' | 'macdCross' | 'bbReversal' | 'breakout' | 'zeroLogic';
 export type LogicType = 'Trend' | 'Reversal' | 'Breakout' | 'Volatility';
 export type Timeframe = 'M1' | 'M5' | 'M15' | 'M30' | 'H1' | 'H4' | 'D1' | 'W1' | 'MN';
 
@@ -20,6 +20,9 @@ export type BacktestSettings = {
   lotSize: number;
   spread: number;
   commission: number;
+  newsGuardEnabled: boolean;
+  newsGuardMinutes: number;
+  newsEvents: string;
 };
 
 export type LogicParams = {
@@ -31,6 +34,18 @@ export type LogicParams = {
   macdSignal: number;
   bollingerPeriod: number;
   breakoutPeriod: number;
+  atrPeriod: number;
+  adxPeriod: number;
+  zeroMinConfirmations: number;
+  vwapPeriod: number;
+  fibonacciLookback: number;
+  zeroMinRiskReward: number;
+  zeroAtrStopMultiplier: number;
+  zeroAtrTargetMultiplier: number;
+  zeroWeightedThreshold: number;
+  volumePeriod: number;
+  volumeMultiplier: number;
+  zeroDisabledConditions: ZeroConditionKey[];
 };
 
 export type LogicDefinition = {
@@ -63,6 +78,12 @@ export type Trade = {
   equity: number;
   drawdown: number;
   barsHeld: number;
+  entryScore?: number;
+  entryGrade?: string;
+  entryConfirmations?: number;
+  entrySRank?: string[];
+  entryARank?: string[];
+  entryBlocks?: string[];
 };
 
 export type CurvePoint = {
@@ -76,6 +97,41 @@ export type PeriodStat = {
   wins: number;
   winRate: number;
   profit: number;
+};
+
+export type ZeroConditionStat = {
+  label: string;
+  rank: 'S' | 'A';
+  trades: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  netProfit: number;
+  profitFactor: number;
+  expectancy: number;
+  averageScore: number;
+  averagePips: number;
+};
+
+export type ZeroConditionKey = 'mtf' | 'dow' | 'horizontal' | 'volume' | 'atr' | 'ema' | 'adx' | 'rsi' | 'candle' | 'riskReward';
+
+export type ZeroOptimizationStat = {
+  conditionKey: ZeroConditionKey;
+  condition: string;
+  rank: 'S' | 'A';
+  baselineTrades: number;
+  testTrades: number;
+  baselineWinRate: number;
+  testWinRate: number;
+  baselineProfitFactor: number;
+  testProfitFactor: number;
+  baselineNetProfit: number;
+  testNetProfit: number;
+  deltaNetProfit: number;
+  baselineScore: number;
+  testScore: number;
+  deltaScore: number;
+  recommendation: 'Keep' | 'Review' | 'Disable Candidate';
 };
 
 export type MarketRegime = 'Trend' | 'Range' | 'High Volatility' | 'Low Volatility';
@@ -153,6 +209,8 @@ export type BacktestAnalytics = {
   monthlyProfits: CurvePoint[];
   weekdayWinRates: PeriodStat[];
   hourlyWinRates: PeriodStat[];
+  zeroConditionStats: ZeroConditionStat[];
+  zeroOptimizationStats: ZeroOptimizationStat[];
   equityCurve: CurvePoint[];
   drawdownCurve: CurvePoint[];
 };
@@ -184,6 +242,23 @@ export type BacktestResult = {
   validation: ReliabilityAnalysis;
 };
 
+export type LiveSignal = {
+  time: string;
+  pair: string;
+  timeframe: Timeframe;
+  logicId: string;
+  logicName: string;
+  side: 'Buy' | 'Sell' | 'Flat';
+  regime: MarketRegime | '-';
+  price: number;
+  takeProfitPrice: number;
+  stopLossPrice: number;
+  takeProfitPips: number;
+  stopLossPips: number;
+  confidence: number;
+  note: string;
+};
+
 export type CsvValidationIssue = {
   severity: 'warning' | 'error';
   message: string;
@@ -207,12 +282,30 @@ export type CsvParseResult = {
 
 type Signal = 'buy' | 'sell' | 'flat';
 
+type TradePlan = {
+  takeProfitPrice: number;
+  stopLossPrice: number;
+  takeProfitPips: number;
+  stopLossPips: number;
+};
+
+type SignalDetail = {
+  signal: Signal;
+  score: number;
+  grade: string;
+  confirmations: number;
+  sRank: string[];
+  aRank: string[];
+  blocks: string[];
+};
+
 export const strategyLabels: Record<StrategyKind, string> = {
   maCross: 'MA Cross',
   rsiReversal: 'RSI Reversal',
   macdCross: 'MACD Cross',
   bbReversal: 'Bollinger Band Reversal',
   breakout: 'Breakout',
+  zeroLogic: 'ZERO Logic',
 };
 
 export const defaultParams: LogicParams = {
@@ -224,6 +317,18 @@ export const defaultParams: LogicParams = {
   macdSignal: 9,
   bollingerPeriod: 20,
   breakoutPeriod: 20,
+  atrPeriod: 14,
+  adxPeriod: 14,
+  zeroMinConfirmations: 7,
+  vwapPeriod: 80,
+  fibonacciLookback: 120,
+  zeroMinRiskReward: 2,
+  zeroAtrStopMultiplier: 1.2,
+  zeroAtrTargetMultiplier: 1.8,
+  zeroWeightedThreshold: 76,
+  volumePeriod: 30,
+  volumeMultiplier: 1.2,
+  zeroDisabledConditions: [],
 };
 
 export const defaultSettings: BacktestSettings = {
@@ -235,6 +340,9 @@ export const defaultSettings: BacktestSettings = {
   lotSize: 1,
   spread: 0.8,
   commission: 0,
+  newsGuardEnabled: false,
+  newsGuardMinutes: 30,
+  newsEvents: '',
 };
 
 export const defaultLogics: LogicDefinition[] = [
@@ -293,6 +401,35 @@ export const defaultLogics: LogicDefinition[] = [
     stopLoss: 34,
     params: { ...defaultParams, breakoutPeriod: 20 },
   },
+  {
+    id: 'logic-zero',
+    strategy: 'zeroLogic',
+    type: 'Trend',
+    name: 'ZERO Logic',
+    description: 'EMA20/75、MA200、RSI、MACD、BB、水平線、ダウ、ATR、ADX/DMI、ローソク足を複合判定する順張りロジック。',
+    enabled: true,
+    takeProfit: 90,
+    stopLoss: 35,
+    params: {
+      ...defaultParams,
+      maFast: 20,
+      maSlow: 75,
+      rsiPeriod: 14,
+      macdFast: 12,
+      macdSlow: 26,
+      macdSignal: 9,
+      bollingerPeriod: 20,
+      breakoutPeriod: 20,
+      atrPeriod: 14,
+      adxPeriod: 14,
+      zeroMinConfirmations: 7,
+      vwapPeriod: 80,
+      fibonacciLookback: 120,
+      zeroMinRiskReward: 2,
+      zeroAtrStopMultiplier: 1.2,
+      zeroAtrTargetMultiplier: 1.8,
+    },
+  },
 ];
 
 export function createLogic(strategy: StrategyKind = 'maCross'): LogicDefinition {
@@ -302,7 +439,24 @@ export function createLogic(strategy: StrategyKind = 'maCross'): LogicDefinition
     macdCross: 'Trend',
     bbReversal: 'Volatility',
     breakout: 'Breakout',
+    zeroLogic: 'Trend',
   };
+  const strategyParams = strategy === 'zeroLogic'
+    ? {
+        ...defaultParams,
+        maFast: 20,
+        maSlow: 75,
+        rsiPeriod: 14,
+        macdFast: 12,
+        macdSlow: 26,
+        macdSignal: 9,
+        bollingerPeriod: 20,
+        breakoutPeriod: 20,
+        atrPeriod: 14,
+        adxPeriod: 14,
+        zeroMinConfirmations: 7,
+      }
+    : { ...defaultParams };
 
   return {
     id: `logic-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -311,9 +465,9 @@ export function createLogic(strategy: StrategyKind = 'maCross'): LogicDefinition
     name: `${strategyLabels[strategy]} Custom`,
     description: 'カスタムロジック',
     enabled: true,
-    takeProfit: 50,
-    stopLoss: 30,
-    params: { ...defaultParams },
+    takeProfit: strategy === 'zeroLogic' ? 90 : 50,
+    stopLoss: strategy === 'zeroLogic' ? 35 : 30,
+    params: strategyParams,
   };
 }
 
@@ -321,6 +475,11 @@ export function normalizeLogic(input: unknown, fallback?: LogicDefinition): Logi
   const source = isRecord(input) ? input : {};
   const legacyKey = readString(source.key);
   const strategy = readStrategy(source.strategy) ?? readStrategy(legacyKey) ?? fallback?.strategy ?? 'maCross';
+  const rawParams = {
+    ...defaultParams,
+    ...(isRecord(fallback?.params) ? fallback?.params : {}),
+    ...(isRecord(source.params) ? source.params : {}),
+  };
 
   return {
     id: readString(source.id) || legacyId(strategy),
@@ -331,11 +490,7 @@ export function normalizeLogic(input: unknown, fallback?: LogicDefinition): Logi
     enabled: typeof source.enabled === 'boolean' ? source.enabled : fallback?.enabled ?? true,
     takeProfit: readNumber(source.takeProfit, fallback?.takeProfit ?? 50),
     stopLoss: readNumber(source.stopLoss, fallback?.stopLoss ?? 30),
-    params: {
-      ...defaultParams,
-      ...(isRecord(fallback?.params) ? fallback?.params : {}),
-      ...(isRecord(source.params) ? source.params : {}),
-    },
+    params: normalizeLogicParams(rawParams),
   };
 }
 
@@ -570,17 +725,80 @@ export function filterCandles(candles: Candle[], settings: BacktestSettings): Ca
   });
 }
 
+export function generateLiveSignal(
+  candles: Candle[],
+  inputLogic: LogicDefinition,
+  settings: BacktestSettings = defaultSettings,
+): LiveSignal {
+  const logic = normalizeLogic(inputLogic);
+  const latest = candles[candles.length - 1];
+  const emptyPrice = latest?.close ?? 0;
+
+  if (!latest || candles.length < 36) {
+    return {
+      time: latest?.time ?? '-',
+      pair: settings.pair,
+      timeframe: settings.timeframe,
+      logicId: logic.id,
+      logicName: logic.name,
+      side: 'Flat',
+      regime: '-',
+      price: emptyPrice,
+      takeProfitPrice: emptyPrice,
+      stopLossPrice: emptyPrice,
+      takeProfitPips: logic.takeProfit,
+      stopLossPips: logic.stopLoss,
+      confidence: 0,
+      note: 'Waiting for enough candles. No order execution.',
+    };
+  }
+
+  const signals = createSignals(candles, logic, settings);
+  const signal = signals[signals.length - 1] ?? 'flat';
+  const side = signal === 'buy' ? 'Buy' : signal === 'sell' ? 'Sell' : 'Flat';
+  const plan = side === 'Flat'
+    ? fixedTradePlan(latest.close, 'Long', logic, settings)
+    : buildTradePlan(candles, candles.length - 1, side === 'Buy' ? 'Long' : 'Short', logic, settings);
+  const regimes = classifyMarketRegimes(candles);
+  const regime = regimes[regimes.length - 1] ?? defaultRegimeForLogic(logic);
+  const regimeMatch =
+    (logic.type === 'Trend' && regime === 'Trend') ||
+    (logic.type === 'Breakout' && regime === 'Trend') ||
+    (logic.type === 'Volatility' && regime === 'High Volatility') ||
+    (logic.type === 'Reversal' && regime === 'Range');
+  const confidence = side === 'Flat' ? 0 : Math.round(Math.min(95, 56 + (regimeMatch ? 18 : 4) + Math.min(candles.length / 60, 12)));
+
+  return {
+    time: latest.time,
+    pair: settings.pair,
+    timeframe: settings.timeframe,
+    logicId: logic.id,
+    logicName: logic.name,
+    side,
+    regime,
+    price: latest.close,
+    takeProfitPrice: side === 'Flat' ? latest.close : plan.takeProfitPrice,
+    stopLossPrice: side === 'Flat' ? latest.close : plan.stopLossPrice,
+    takeProfitPips: side === 'Flat' ? 0 : plan.takeProfitPips,
+    stopLossPips: side === 'Flat' ? 0 : plan.stopLossPips,
+    confidence,
+    note: side === 'Flat' ? 'No signal. Monitoring only.' : 'Signal alert only. No auto trade executed.',
+  };
+}
+
 function runLogic(
   candles: Candle[],
   logic: LogicDefinition,
   settings: BacktestSettings,
   includeValidation = false,
+  disabledZeroCondition?: ZeroConditionKey,
 ): BacktestResult {
-  const signals = createSignals(candles, logic);
+  const signalDetails = createSignalDetails(candles, logic, settings, disabledZeroCondition);
+  const signals = signalDetails.map((detail) => detail.signal);
   const trades: Trade[] = [];
   let equity = settings.initialCapital;
   let peak = settings.initialCapital;
-  let openTrade: { direction: 'Long' | 'Short'; entryIndex: number; entryPrice: number } | null = null;
+  let openTrade: { direction: 'Long' | 'Short'; entryIndex: number; entryPrice: number; plan: TradePlan; detail: SignalDetail } | null = null;
 
   signals.forEach((signal, index) => {
     if (index < 35) return;
@@ -591,13 +809,15 @@ function runLogic(
         direction: signal === 'buy' ? 'Long' : 'Short',
         entryIndex: index,
         entryPrice: candle.close,
+        plan: buildTradePlan(candles, index, signal === 'buy' ? 'Long' : 'Short', logic, settings),
+        detail: signalDetails[index],
       };
       return;
     }
 
     if (!openTrade) return;
 
-    const exit = resolveExit(openTrade.direction, openTrade.entryPrice, candle, signal, index, openTrade.entryIndex, candles.length, logic, settings);
+    const exit = resolveExit(openTrade.direction, openTrade.entryPrice, openTrade.plan, candle, signal, index, openTrade.entryIndex, candles.length);
 
     if (exit) {
       const result = calculateTradeProfit(openTrade.direction, openTrade.entryPrice, exit.price, settings);
@@ -622,6 +842,12 @@ function runLogic(
         equity,
         drawdown: peak - equity,
         barsHeld: index - openTrade.entryIndex,
+        entryScore: openTrade.detail.score,
+        entryGrade: openTrade.detail.grade,
+        entryConfirmations: openTrade.detail.confirmations,
+        entrySRank: openTrade.detail.sRank,
+        entryARank: openTrade.detail.aRank,
+        entryBlocks: openTrade.detail.blocks,
       });
       openTrade = null;
     }
@@ -633,24 +859,19 @@ function runLogic(
 function resolveExit(
   direction: 'Long' | 'Short',
   entryPrice: number,
+  plan: TradePlan,
   candle: Candle,
   signal: Signal,
   currentIndex: number,
   entryIndex: number,
   candleCount: number,
-  logic: LogicDefinition,
-  settings: BacktestSettings,
 ): { price: number; reason: Trade['exitReason'] } | null {
-  const pipSize = settings.pair.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
-  const tp = Math.max(logic.takeProfit, 0) * pipSize;
-  const sl = Math.max(logic.stopLoss, 0) * pipSize;
-
   if (direction === 'Long') {
-    if (sl > 0 && candle.low <= entryPrice - sl) return { price: entryPrice - sl, reason: 'SL' };
-    if (tp > 0 && candle.high >= entryPrice + tp) return { price: entryPrice + tp, reason: 'TP' };
+    if (plan.stopLossPrice < entryPrice && candle.low <= plan.stopLossPrice) return { price: plan.stopLossPrice, reason: 'SL' };
+    if (plan.takeProfitPrice > entryPrice && candle.high >= plan.takeProfitPrice) return { price: plan.takeProfitPrice, reason: 'TP' };
   } else {
-    if (sl > 0 && candle.high >= entryPrice + sl) return { price: entryPrice + sl, reason: 'SL' };
-    if (tp > 0 && candle.low <= entryPrice - tp) return { price: entryPrice - tp, reason: 'TP' };
+    if (plan.stopLossPrice > entryPrice && candle.high >= plan.stopLossPrice) return { price: plan.stopLossPrice, reason: 'SL' };
+    if (plan.takeProfitPrice < entryPrice && candle.low <= plan.takeProfitPrice) return { price: plan.takeProfitPrice, reason: 'TP' };
   }
 
   const opposite = (direction === 'Long' && signal === 'sell') || (direction === 'Short' && signal === 'buy');
@@ -660,13 +881,94 @@ function resolveExit(
   return null;
 }
 
+function buildTradePlan(
+  candles: Candle[],
+  entryIndex: number,
+  direction: 'Long' | 'Short',
+  logic: LogicDefinition,
+  settings: BacktestSettings,
+): TradePlan {
+  const entryPrice = candles[entryIndex]?.close ?? 0;
+  if (logic.strategy !== 'zeroLogic') return fixedTradePlan(entryPrice, direction, logic, settings);
+
+  const pipSize = pipSizeFor(settings);
+  const currentAtr = atr(candles.slice(0, entryIndex + 1), Math.max(2, logic.params.atrPeriod))[entryIndex] ?? 0;
+  const atrDistance = Math.max(currentAtr * Math.max(0.2, logic.params.zeroAtrStopMultiplier), pipSize);
+  const fixedStopDistance = Math.max(logic.stopLoss, 0) * pipSize;
+  const fixedTargetDistance = Math.max(logic.takeProfit, 0) * pipSize;
+  const riskReward = Math.max(1, logic.params.zeroMinRiskReward);
+  const lookback = Math.max(5, logic.params.breakoutPeriod);
+  const recent = candles.slice(Math.max(0, entryIndex - lookback), entryIndex + 1);
+  const recentLow = Math.min(...recent.map((candle) => candle.low));
+  const recentHigh = Math.max(...recent.map((candle) => candle.high));
+  const horizontal = candles.slice(Math.max(0, entryIndex - Math.max(lookback * 2, logic.params.fibonacciLookback)), entryIndex);
+
+  if (direction === 'Long') {
+    const swingStop = Number.isFinite(recentLow) ? recentLow - pipSize : entryPrice - atrDistance;
+    const stopPrice = Math.min(entryPrice - Math.max(atrDistance, fixedStopDistance), swingStop);
+    const stopDistance = Math.max(entryPrice - stopPrice, pipSize);
+    const nextResistance = horizontal
+      .map((candle) => candle.high)
+      .filter((price) => price > entryPrice + stopDistance * riskReward)
+      .sort((a, b) => a - b)[0];
+    const baseTargetDistance = Math.max(
+      stopDistance * riskReward,
+      currentAtr * Math.max(1, logic.params.zeroAtrTargetMultiplier),
+      fixedTargetDistance,
+    );
+    const targetDistance = nextResistance ? Math.min(baseTargetDistance, nextResistance - entryPrice) : baseTargetDistance;
+
+    return pricePlan(entryPrice, entryPrice + targetDistance, stopPrice, pipSize);
+  }
+
+  const swingStop = Number.isFinite(recentHigh) ? recentHigh + pipSize : entryPrice + atrDistance;
+  const stopPrice = Math.max(entryPrice + Math.max(atrDistance, fixedStopDistance), swingStop);
+  const stopDistance = Math.max(stopPrice - entryPrice, pipSize);
+  const nextSupport = horizontal
+    .map((candle) => candle.low)
+    .filter((price) => price < entryPrice - stopDistance * riskReward)
+    .sort((a, b) => b - a)[0];
+  const baseTargetDistance = Math.max(
+    stopDistance * riskReward,
+    currentAtr * Math.max(1, logic.params.zeroAtrTargetMultiplier),
+    fixedTargetDistance,
+  );
+  const targetDistance = nextSupport ? Math.min(baseTargetDistance, entryPrice - nextSupport) : baseTargetDistance;
+
+  return pricePlan(entryPrice, entryPrice - targetDistance, stopPrice, pipSize);
+}
+
+function fixedTradePlan(
+  entryPrice: number,
+  direction: 'Long' | 'Short',
+  logic: LogicDefinition,
+  settings: BacktestSettings,
+): TradePlan {
+  const pipSize = pipSizeFor(settings);
+  const targetDistance = Math.max(logic.takeProfit, 0) * pipSize;
+  const stopDistance = Math.max(logic.stopLoss, 0) * pipSize;
+  const takeProfitPrice = direction === 'Long' ? entryPrice + targetDistance : entryPrice - targetDistance;
+  const stopLossPrice = direction === 'Long' ? entryPrice - stopDistance : entryPrice + stopDistance;
+  return pricePlan(entryPrice, takeProfitPrice, stopLossPrice, pipSize);
+}
+
+function pricePlan(entryPrice: number, takeProfitPrice: number, stopLossPrice: number, pipSize: number): TradePlan {
+  const roundPips = (value: number) => Math.round(Math.abs(value / pipSize) * 10) / 10;
+  return {
+    takeProfitPrice,
+    stopLossPrice,
+    takeProfitPips: roundPips(takeProfitPrice - entryPrice),
+    stopLossPips: roundPips(stopLossPrice - entryPrice),
+  };
+}
+
 function calculateTradeProfit(
   direction: 'Long' | 'Short',
   entryPrice: number,
   exitPrice: number,
   settings: BacktestSettings,
 ): { pips: number; grossProfit: number; cost: number; profit: number } {
-  const pipSize = settings.pair.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
+  const pipSize = pipSizeFor(settings);
   const pipValuePerLot = settings.pair.toUpperCase().includes('JPY') ? 1000 : 10;
   const rawPips = direction === 'Long' ? (exitPrice - entryPrice) / pipSize : (entryPrice - exitPrice) / pipSize;
   const grossProfit = rawPips * pipValuePerLot * settings.lotSize;
@@ -687,7 +989,7 @@ function calculateMaxFloatingLoss(
   candles: Candle[],
   settings: BacktestSettings,
 ): number {
-  const pipSize = settings.pair.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
+  const pipSize = pipSizeFor(settings);
   const pipValuePerLot = settings.pair.toUpperCase().includes('JPY') ? 1000 : 10;
   let worstPips = 0;
 
@@ -699,6 +1001,10 @@ function calculateMaxFloatingLoss(
   });
 
   return Math.abs(worstPips * pipValuePerLot * settings.lotSize);
+}
+
+function pipSizeFor(settings: BacktestSettings): number {
+  return settings.pair.toUpperCase().includes('JPY') ? 0.01 : 0.0001;
 }
 
 function summarize(
@@ -749,6 +1055,27 @@ function summarize(
     initialCapital: settings.initialCapital,
   });
 
+  const analytics: BacktestAnalytics = {
+    expectancy,
+    riskReward,
+    sharpeRatio,
+    recoveryFactor,
+    payoffRatio,
+    averageHoldingBars,
+    maxFloatingLoss,
+    maxSingleLoss,
+    maxSingleProfit,
+    maxConsecutiveWins: calculateStreak(trades, true),
+    maxConsecutiveLosses,
+    monthlyProfits: groupMonthlyProfits(trades),
+    weekdayWinRates: groupWinRates(trades, 'weekday'),
+    hourlyWinRates: groupWinRates(trades, 'hour'),
+    zeroConditionStats: groupZeroConditionStats(trades),
+    zeroOptimizationStats: [],
+    equityCurve: buildEquityCurve(trades, settings.initialCapital),
+    drawdownCurve: trades.map((trade) => ({ label: trade.exitTime, value: trade.drawdown })),
+  };
+
   const baseResult = {
     logicId: logic.id,
     logicName: logic.name,
@@ -765,25 +1092,12 @@ function summarize(
     reliability,
     warnings,
     trades,
-    analytics: {
-      expectancy,
-      riskReward,
-      sharpeRatio,
-      recoveryFactor,
-      payoffRatio,
-      averageHoldingBars,
-      maxFloatingLoss,
-      maxSingleLoss,
-      maxSingleProfit,
-      maxConsecutiveWins: calculateStreak(trades, true),
-      maxConsecutiveLosses,
-      monthlyProfits: groupMonthlyProfits(trades),
-      weekdayWinRates: groupWinRates(trades, 'weekday'),
-      hourlyWinRates: groupWinRates(trades, 'hour'),
-      equityCurve: buildEquityCurve(trades, settings.initialCapital),
-      drawdownCurve: trades.map((trade) => ({ label: trade.exitTime, value: trade.drawdown })),
-    },
+    analytics,
   };
+
+  if (includeValidation && logic.strategy === 'zeroLogic') {
+    baseResult.analytics.zeroOptimizationStats = analyzeZeroConditionOptimization(candles, logic, settings, baseResult);
+  }
 
   return {
     ...baseResult,
@@ -1203,11 +1517,108 @@ function groupWinRates(trades: Trade[], unit: 'weekday' | 'hour'): PeriodStat[] 
   }));
 }
 
+function groupZeroConditionStats(trades: Trade[]): ZeroConditionStat[] {
+  const buckets = new Map<string, { label: string; rank: 'S' | 'A'; trades: Trade[] }>();
+
+  trades.forEach((trade) => {
+    (trade.entrySRank ?? []).forEach((label) => {
+      const key = `S:${label}`;
+      const current = buckets.get(key) ?? { label, rank: 'S' as const, trades: [] };
+      current.trades.push(trade);
+      buckets.set(key, current);
+    });
+
+    (trade.entryARank ?? []).forEach((label) => {
+      const key = `A:${label}`;
+      const current = buckets.get(key) ?? { label, rank: 'A' as const, trades: [] };
+      current.trades.push(trade);
+      buckets.set(key, current);
+    });
+  });
+
+  return [...buckets.values()]
+    .map(({ label, rank, trades: items }) => {
+      const wins = items.filter((trade) => trade.profit > 0);
+      const losses = items.filter((trade) => trade.profit < 0);
+      const grossProfit = wins.reduce((sum, trade) => sum + trade.profit, 0);
+      const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.profit, 0));
+      const netProfit = items.reduce((sum, trade) => sum + trade.profit, 0);
+
+      return {
+        label,
+        rank,
+        trades: items.length,
+        wins: wins.length,
+        losses: losses.length,
+        winRate: items.length ? (wins.length / items.length) * 100 : 0,
+        netProfit,
+        profitFactor: grossLoss === 0 ? (grossProfit > 0 ? 99 : 0) : grossProfit / grossLoss,
+        expectancy: items.length ? netProfit / items.length : 0,
+        averageScore: items.length ? items.reduce((sum, trade) => sum + (trade.entryScore ?? 0), 0) / items.length : 0,
+        averagePips: items.length ? items.reduce((sum, trade) => sum + trade.pips, 0) / items.length : 0,
+      };
+    })
+    .sort((a, b) => (a.rank === b.rank ? b.netProfit - a.netProfit : a.rank === 'S' ? -1 : 1));
+}
+
+function analyzeZeroConditionOptimization(
+  candles: Candle[],
+  logic: LogicDefinition,
+  settings: BacktestSettings,
+  baseline: Omit<BacktestResult, 'validation'>,
+): ZeroOptimizationStat[] {
+  if (logic.strategy !== 'zeroLogic' || candles.length < 260 || baseline.tradeCount === 0) return [];
+  const alreadyDisabled = new Set(logic.params.zeroDisabledConditions ?? []);
+
+  return zeroOptimizationConditions().filter((condition) => !alreadyDisabled.has(condition.key)).map((condition) => {
+    const variant = runLogic(candles, {
+      ...logic,
+      id: `${logic.id}-without-${condition.key}`,
+      name: `${logic.name} without ${condition.label}`,
+    }, settings, false, condition.key);
+    const deltaNetProfit = variant.netProfit - baseline.netProfit;
+    const deltaScore = variant.score - baseline.score;
+    const tradeRatio = variant.tradeCount / Math.max(baseline.tradeCount, 1);
+    const pfImproved = variant.profitFactor >= baseline.profitFactor;
+    const profitImproved = deltaNetProfit > Math.max(Math.abs(baseline.netProfit) * 0.08, 1);
+    const scoreImproved = deltaScore >= 4;
+    const harmfulWhenRemoved = deltaNetProfit < -Math.max(Math.abs(baseline.netProfit) * 0.08, 1) || deltaScore <= -4;
+    const recommendation: ZeroOptimizationStat['recommendation'] =
+      profitImproved && pfImproved && tradeRatio >= 0.45
+        ? 'Disable Candidate'
+        : harmfulWhenRemoved || (condition.rank === 'S' && !scoreImproved)
+          ? 'Keep'
+          : 'Review';
+
+    return {
+      conditionKey: condition.key,
+      condition: condition.label,
+      rank: condition.rank,
+      baselineTrades: baseline.tradeCount,
+      testTrades: variant.tradeCount,
+      baselineWinRate: baseline.winRate,
+      testWinRate: variant.winRate,
+      baselineProfitFactor: baseline.profitFactor,
+      testProfitFactor: variant.profitFactor,
+      baselineNetProfit: baseline.netProfit,
+      testNetProfit: variant.netProfit,
+      deltaNetProfit,
+      baselineScore: baseline.score,
+      testScore: variant.score,
+      deltaScore,
+      recommendation,
+    };
+  }).sort((a, b) => {
+    const rankOrder = a.rank === b.rank ? 0 : a.rank === 'S' ? -1 : 1;
+    return rankOrder || b.deltaNetProfit - a.deltaNetProfit;
+  });
+}
+
 function buildEquityCurve(trades: Trade[], initialCapital: number): CurvePoint[] {
   return [{ label: 'Start', value: initialCapital }, ...trades.map((trade) => ({ label: trade.exitTime, value: trade.equity }))];
 }
 
-function createSignals(candles: Candle[], logic: LogicDefinition): Signal[] {
+function createSignals(candles: Candle[], logic: LogicDefinition, settings: BacktestSettings = defaultSettings, disabledZeroCondition?: ZeroConditionKey): Signal[] {
   const closes = candles.map((candle) => candle.close);
   switch (logic.strategy) {
     case 'maCross':
@@ -1220,7 +1631,258 @@ function createSignals(candles: Candle[], logic: LogicDefinition): Signal[] {
       return bollingerSignals(closes, logic.params.bollingerPeriod);
     case 'breakout':
       return breakoutSignals(candles, logic.params.breakoutPeriod);
+    case 'zeroLogic':
+      return zeroLogicSignalDetails(candles, logic.params, settings, disabledZeroCondition).map((detail) => detail.signal);
   }
+}
+
+function createSignalDetails(candles: Candle[], logic: LogicDefinition, settings: BacktestSettings = defaultSettings, disabledZeroCondition?: ZeroConditionKey): SignalDetail[] {
+  if (logic.strategy === 'zeroLogic') return zeroLogicSignalDetails(candles, logic.params, settings, disabledZeroCondition);
+  return createSignals(candles, logic, settings, disabledZeroCondition).map((signal) => ({
+    signal,
+    score: signal === 'flat' ? 0 : 50,
+    grade: signal === 'flat' ? '-' : 'Basic',
+    confirmations: signal === 'flat' ? 0 : 1,
+    sRank: [],
+    aRank: [],
+    blocks: [],
+  }));
+}
+
+function zeroLogicSignalDetails(candles: Candle[], params: LogicParams, settings: BacktestSettings, disabledZeroCondition?: ZeroConditionKey): SignalDetail[] {
+  const disabledConditions = uniqueZeroConditions([...(params.zeroDisabledConditions ?? []), ...(disabledZeroCondition ? [disabledZeroCondition] : [])]);
+  const closes = candles.map((candle) => candle.close);
+  const emaFast = ema(closes, Math.max(2, params.maFast));
+  const emaSlow = ema(closes, Math.max(3, params.maSlow));
+  const trendMa = sma(closes, 200);
+  const rsiValues = rsi(closes, Math.max(2, params.rsiPeriod));
+  const macdSet = macdSeries(closes, params.macdFast, params.macdSlow, params.macdSignal);
+  const bb = bollingerSeries(closes, Math.max(3, params.bollingerPeriod));
+  const atrValues = atr(candles, Math.max(2, params.atrPeriod));
+  const atrAverage = sma(atrValues, Math.max(5, params.atrPeriod));
+  const dmiValues = dmi(candles, Math.max(2, params.adxPeriod));
+  const vwapValues = rollingVwap(candles, Math.max(5, params.vwapPeriod));
+  const averageVolume = sma(candles.map((candle) => candle.volume), Math.max(5, params.volumePeriod));
+  const higherTimeframeBias = multiTimeframeBias(candles, settings.timeframe);
+  const newsWindows = buildNewsGuardWindows(settings);
+  const minConfirmations = Math.max(1, Math.min(13, Math.round(params.zeroMinConfirmations)));
+  const weightedThreshold = zeroAdjustedThreshold(Math.max(40, Math.min(100, params.zeroWeightedThreshold)), disabledConditions);
+  const breakoutPeriod = Math.max(5, params.breakoutPeriod);
+
+  return candles.map((candle, index) => {
+    if (index < Math.max(200, breakoutPeriod * 2, params.adxPeriod * 2, params.atrPeriod * 2, params.fibonacciLookback)) {
+      return emptySignalDetail('Waiting for ZERO lookback');
+    }
+    if (isNewsGuarded(candle.time, newsWindows)) return emptySignalDetail('News Guard');
+
+    const previousRsi = rsiValues[index - 1] ?? 0;
+    const currentRsi = rsiValues[index] ?? 0;
+    const overExtended = currentRsi >= 70 || currentRsi <= 30;
+    if (overExtended) return emptySignalDetail('RSI overextended');
+
+    const previousWindow = candles.slice(index - breakoutPeriod * 2, index - breakoutPeriod);
+    const currentWindow = candles.slice(index - breakoutPeriod, index);
+    const breakoutWindow = candles.slice(index - breakoutPeriod, index);
+    const previousHigh = Math.max(...previousWindow.map((item) => item.high));
+    const previousLow = Math.min(...previousWindow.map((item) => item.low));
+    const currentHigh = Math.max(...currentWindow.map((item) => item.high));
+    const currentLow = Math.min(...currentWindow.map((item) => item.low));
+    const breakoutHigh = Math.max(...breakoutWindow.map((item) => item.high));
+    const breakoutLow = Math.min(...breakoutWindow.map((item) => item.low));
+    const macdLine = macdSet.macd[index] ?? 0;
+    const macdSignal = macdSet.signal[index] ?? 0;
+    const previousMacdLine = macdSet.macd[index - 1] ?? 0;
+    const previousMacdSignal = macdSet.signal[index - 1] ?? 0;
+    const currentAtr = atrValues[index] ?? 0;
+    const averageAtr = atrAverage[index] ?? 0;
+    const currentAverageVolume = averageVolume[index] ?? 0;
+    const currentDmi = dmiValues[index];
+    const candlePattern = candlePatternSignal(candles, index);
+    const bbSignal = bollingerBreakoutSignal(candle.close, bb, index);
+    const fibSignal = fibonacciPullbackSignal(candles, index, Math.max(20, params.fibonacciLookback));
+    const higherBias = higherTimeframeBias[index] ?? 'flat';
+    const previousVwap = vwapValues[index - 1] ?? 0;
+    const currentVwap = vwapValues[index] ?? 0;
+
+    const atrOk = currentAtr > 0 && averageAtr > 0 && currentAtr >= averageAtr * 0.75;
+    const adxOk = currentDmi.adx >= 25;
+    const volumeOk = currentAverageVolume > 0 && candle.volume >= currentAverageVolume * Math.max(0.1, params.volumeMultiplier);
+    const horizontal = horizontalReactionSignal(candles, index, Math.max(breakoutPeriod * 3, 60), Math.max(currentAtr * 0.28, candle.close * 0.0008));
+    const vwapBuy = currentVwap > 0 && candle.close > currentVwap && currentVwap >= previousVwap;
+    const vwapSell = currentVwap > 0 && candle.close < currentVwap && currentVwap <= previousVwap;
+    const mtfBuy = higherBias === 'buy';
+    const mtfSell = higherBias === 'sell';
+    const dowBuy = currentHigh > previousHigh && currentLow > previousLow;
+    const dowSell = currentHigh < previousHigh && currentLow < previousLow;
+    const mtfBuyPass = zeroConditionPass('mtf', mtfBuy, disabledConditions);
+    const mtfSellPass = zeroConditionPass('mtf', mtfSell, disabledConditions);
+    const dowBuyPass = zeroConditionPass('dow', dowBuy, disabledConditions);
+    const dowSellPass = zeroConditionPass('dow', dowSell, disabledConditions);
+    const horizontalBuyPass = zeroConditionPass('horizontal', horizontal.buy, disabledConditions);
+    const horizontalSellPass = zeroConditionPass('horizontal', horizontal.sell, disabledConditions);
+    const volumePass = zeroConditionPass('volume', volumeOk, disabledConditions);
+    const atrPass = zeroConditionPass('atr', atrOk, disabledConditions);
+    const macdBuy = macdLine > macdSignal || (previousMacdLine <= previousMacdSignal && macdLine > macdSignal);
+    const macdSell = macdLine < macdSignal || (previousMacdLine >= previousMacdSignal && macdLine < macdSignal);
+    const rsiBuy = currentRsi >= 40 && currentRsi <= 60 && currentRsi > previousRsi;
+    const rsiSell = currentRsi >= 40 && currentRsi <= 60 && currentRsi < previousRsi;
+    const rrOk = params.zeroMinRiskReward >= 2;
+    const emaBuy = emaFast[index] > emaSlow[index];
+    const emaSell = emaFast[index] < emaSlow[index];
+    const adxBuy = adxOk && currentDmi.plusDi > currentDmi.minusDi;
+    const adxSell = adxOk && currentDmi.minusDi > currentDmi.plusDi;
+    const candleBuy = candlePattern === 'buy';
+    const candleSell = candlePattern === 'sell';
+    const rsiBuyPass = zeroConditionPass('rsi', rsiBuy, disabledConditions);
+    const rsiSellPass = zeroConditionPass('rsi', rsiSell, disabledConditions);
+    const emaBuyPass = zeroConditionPass('ema', emaBuy, disabledConditions);
+    const emaSellPass = zeroConditionPass('ema', emaSell, disabledConditions);
+    const adxBuyPass = zeroConditionPass('adx', adxBuy, disabledConditions);
+    const adxSellPass = zeroConditionPass('adx', adxSell, disabledConditions);
+    const candleBuyPass = zeroConditionPass('candle', candleBuy, disabledConditions);
+    const candleSellPass = zeroConditionPass('candle', candleSell, disabledConditions);
+    const rrPass = zeroConditionPass('riskReward', rrOk, disabledConditions);
+    const upperTrendBuy = candle.close > trendMa[index] && mtfBuyPass;
+    const upperTrendSell = candle.close < trendMa[index] && mtfSellPass;
+
+    const buyChecks = [
+      upperTrendBuy,
+      emaBuyPass,
+      dowBuyPass,
+      rsiBuyPass,
+      macdBuy,
+      adxBuyPass,
+      candle.close > breakoutHigh && horizontalBuyPass && volumePass,
+      candleBuyPass,
+      bbSignal === 'buy',
+      atrPass,
+      vwapBuy,
+      fibSignal === 'buy',
+      mtfBuyPass,
+    ];
+
+    const sellChecks = [
+      upperTrendSell,
+      emaSellPass,
+      dowSellPass,
+      rsiSellPass,
+      macdSell,
+      adxSellPass,
+      candle.close < breakoutLow && horizontalSellPass && volumePass,
+      candleSellPass,
+      bbSignal === 'sell',
+      atrPass,
+      vwapSell,
+      fibSignal === 'sell',
+      mtfSellPass,
+    ];
+
+    const buyScore = buyChecks.filter(Boolean).length;
+    const sellScore = sellChecks.filter(Boolean).length;
+    const buyWeightedScore = zeroWeightedScore({
+      mtf: mtfBuy,
+      dow: dowBuy,
+      horizontal: horizontal.buy,
+      volume: volumeOk,
+      atr: atrOk,
+      ema: emaBuy,
+      adx: adxBuy,
+      rsi: rsiBuy,
+      candle: candleBuy,
+      riskReward: rrOk,
+    }, disabledConditions);
+    const sellWeightedScore = zeroWeightedScore({
+      mtf: mtfSell,
+      dow: dowSell,
+      horizontal: horizontal.sell,
+      volume: volumeOk,
+      atr: atrOk,
+      ema: emaSell,
+      adx: adxSell,
+      rsi: rsiSell,
+      candle: candleSell,
+      riskReward: rrOk,
+    }, disabledConditions);
+    const baseBuyOk = mtfBuyPass && dowBuyPass && horizontalBuyPass && volumePass && atrPass && adxBuyPass && emaBuyPass && rrPass;
+    const baseSellOk = mtfSellPass && dowSellPass && horizontalSellPass && volumePass && atrPass && adxSellPass && emaSellPass && rrPass;
+
+    const buySRank = conditionNames([
+      ['MTF aligned', mtfBuy],
+      ['Dow structure', dowBuy],
+      ['Horizontal break', horizontal.buy],
+      ['Volume confirmed', volumeOk],
+      ['ATR active', atrOk],
+    ]);
+    const sellSRank = conditionNames([
+      ['MTF aligned', mtfSell],
+      ['Dow structure', dowSell],
+      ['Horizontal break', horizontal.sell],
+      ['Volume confirmed', volumeOk],
+      ['ATR active', atrOk],
+    ]);
+    const buyARank = conditionNames([
+      ['EMA20/75', emaFast[index] > emaSlow[index]],
+      ['ADX/DMI', adxOk && currentDmi.plusDi > currentDmi.minusDi],
+      ['RSI 40-60', rsiBuy],
+      ['Candle pattern', candlePattern === 'buy'],
+      ['Risk reward', rrOk],
+      ['VWAP', vwapBuy],
+      ['Fibonacci', fibSignal === 'buy'],
+      ['MACD', macdBuy],
+      ['BB squeeze break', bbSignal === 'buy'],
+    ]);
+    const sellARank = conditionNames([
+      ['EMA20/75', emaFast[index] < emaSlow[index]],
+      ['ADX/DMI', adxOk && currentDmi.minusDi > currentDmi.plusDi],
+      ['RSI 40-60', rsiSell],
+      ['Candle pattern', candlePattern === 'sell'],
+      ['Risk reward', rrOk],
+      ['VWAP', vwapSell],
+      ['Fibonacci', fibSignal === 'sell'],
+      ['MACD', macdSell],
+      ['BB squeeze break', bbSignal === 'sell'],
+    ]);
+
+    if (baseBuyOk && buyScore >= minConfirmations && buyWeightedScore >= weightedThreshold && buyWeightedScore >= sellWeightedScore + 12) {
+      return zeroSignalDetail('buy', buyWeightedScore, buyScore, buySRank, buyARank);
+    }
+    if (baseSellOk && sellScore >= minConfirmations && sellWeightedScore >= weightedThreshold && sellWeightedScore >= buyWeightedScore + 12) {
+      return zeroSignalDetail('sell', sellWeightedScore, sellScore, sellSRank, sellARank);
+    }
+
+    const buyBlocks = zeroBlocks({
+      mtf: mtfBuy,
+      dow: dowBuy,
+      horizontal: horizontal.buy,
+      volume: volumeOk,
+      atr: atrOk,
+      adx: adxOk,
+      ema: emaFast[index] > emaSlow[index],
+      score: buyWeightedScore,
+      threshold: weightedThreshold,
+    }, disabledConditions);
+    const sellBlocks = zeroBlocks({
+      mtf: mtfSell,
+      dow: dowSell,
+      horizontal: horizontal.sell,
+      volume: volumeOk,
+      atr: atrOk,
+      adx: adxOk,
+      ema: emaFast[index] < emaSlow[index],
+      score: sellWeightedScore,
+      threshold: weightedThreshold,
+    }, disabledConditions);
+    const bestBuy = buyWeightedScore >= sellWeightedScore;
+    return {
+      signal: 'flat',
+      score: Math.max(buyWeightedScore, sellWeightedScore),
+      grade: '-',
+      confirmations: Math.max(buyScore, sellScore),
+      sRank: bestBuy ? buySRank : sellSRank,
+      aRank: bestBuy ? buyARank : sellARank,
+      blocks: bestBuy ? buyBlocks : sellBlocks,
+    };
+  });
 }
 
 function maCrossSignals(closes: number[], fastPeriod: number, slowPeriod: number): Signal[] {
@@ -1245,10 +1907,7 @@ function rsiSignals(closes: number[], period: number): Signal[] {
 }
 
 function macdSignals(closes: number[], fastPeriod: number, slowPeriod: number, signalPeriod: number): Signal[] {
-  const fast = ema(closes, Math.max(2, fastPeriod));
-  const slow = ema(closes, Math.max(3, slowPeriod));
-  const macd = fast.map((value, index) => value - slow[index]);
-  const signal = ema(macd, Math.max(2, signalPeriod));
+  const { macd, signal } = macdSeries(closes, fastPeriod, slowPeriod, signalPeriod);
 
   return closes.map((_, index) => {
     if (index === 0) return 'flat';
@@ -1256,6 +1915,14 @@ function macdSignals(closes: number[], fastPeriod: number, slowPeriod: number, s
     if (macd[index - 1] >= signal[index - 1] && macd[index] < signal[index]) return 'sell';
     return 'flat';
   });
+}
+
+function macdSeries(closes: number[], fastPeriod: number, slowPeriod: number, signalPeriod: number): { macd: number[]; signal: number[] } {
+  const fast = ema(closes, Math.max(2, fastPeriod));
+  const slow = ema(closes, Math.max(3, slowPeriod));
+  const macd = fast.map((value, index) => value - slow[index]);
+  const signal = ema(macd, Math.max(2, signalPeriod));
+  return { macd, signal };
 }
 
 function bollingerSignals(closes: number[], period: number): Signal[] {
@@ -1283,6 +1950,369 @@ function breakoutSignals(candles: Candle[], period: number): Signal[] {
     if (candle.close < low) return 'sell';
     return 'flat';
   });
+}
+
+function bollingerSeries(closes: number[], period: number): { mid: number[]; upper: number[]; lower: number[]; width: number[] } {
+  const mid = sma(closes, period);
+  const dev = rollingStd(closes, period);
+  return {
+    mid,
+    upper: mid.map((value, index) => value + dev[index] * 2),
+    lower: mid.map((value, index) => value - dev[index] * 2),
+    width: mid.map((value, index) => (value === 0 ? 0 : (dev[index] * 4) / value)),
+  };
+}
+
+function bollingerBreakoutSignal(close: number, bb: { upper: number[]; lower: number[]; width: number[] }, index: number): Signal {
+  const widthWindow = bb.width.slice(Math.max(0, index - 40), index).filter((value) => value > 0);
+  if (widthWindow.length < 10 || !bb.upper[index] || !bb.lower[index]) return 'flat';
+  const averageWidth = widthWindow.reduce((sum, value) => sum + value, 0) / widthWindow.length;
+  const squeezed = bb.width[index - 1] > 0 && bb.width[index - 1] <= averageWidth * 0.85;
+  if (squeezed && close > bb.upper[index]) return 'buy';
+  if (squeezed && close < bb.lower[index]) return 'sell';
+  return 'flat';
+}
+
+function atr(candles: Candle[], period: number): number[] {
+  const trueRanges = candles.map((candle, index) => {
+    if (index === 0) return candle.high - candle.low;
+    const previousClose = candles[index - 1].close;
+    return Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose),
+    );
+  });
+  return sma(trueRanges, period);
+}
+
+function dmi(candles: Candle[], period: number): Array<{ plusDi: number; minusDi: number; adx: number }> {
+  const plusDm = Array(candles.length).fill(0);
+  const minusDm = Array(candles.length).fill(0);
+  const trueRanges = Array(candles.length).fill(0);
+
+  for (let index = 1; index < candles.length; index += 1) {
+    const upMove = candles[index].high - candles[index - 1].high;
+    const downMove = candles[index - 1].low - candles[index].low;
+    plusDm[index] = upMove > downMove && upMove > 0 ? upMove : 0;
+    minusDm[index] = downMove > upMove && downMove > 0 ? downMove : 0;
+    trueRanges[index] = Math.max(
+      candles[index].high - candles[index].low,
+      Math.abs(candles[index].high - candles[index - 1].close),
+      Math.abs(candles[index].low - candles[index - 1].close),
+    );
+  }
+
+  const tr = sma(trueRanges, period);
+  const plus = sma(plusDm, period);
+  const minus = sma(minusDm, period);
+  const dx = candles.map((_, index) => {
+    if (!tr[index]) return 0;
+    const plusDi = (plus[index] / tr[index]) * 100;
+    const minusDi = (minus[index] / tr[index]) * 100;
+    const total = plusDi + minusDi;
+    return total === 0 ? 0 : (Math.abs(plusDi - minusDi) / total) * 100;
+  });
+  const adx = sma(dx, period);
+
+  return candles.map((_, index) => {
+    if (!tr[index]) return { plusDi: 0, minusDi: 0, adx: 0 };
+    return {
+      plusDi: (plus[index] / tr[index]) * 100,
+      minusDi: (minus[index] / tr[index]) * 100,
+      adx: adx[index] ?? 0,
+    };
+  });
+}
+
+function candlePatternSignal(candles: Candle[], index: number): Signal {
+  if (index < 1) return 'flat';
+  const current = candles[index];
+  const previous = candles[index - 1];
+  const currentBody = Math.abs(current.close - current.open);
+  const previousBody = Math.abs(previous.close - previous.open);
+  const currentRange = Math.max(current.high - current.low, 0.000001);
+  const upperWick = current.high - Math.max(current.open, current.close);
+  const lowerWick = Math.min(current.open, current.close) - current.low;
+  const bullish = current.close > current.open;
+  const bearish = current.close < current.open;
+  const previousBullish = previous.close > previous.open;
+  const previousBearish = previous.close < previous.open;
+
+  const bullishEngulfing = bullish && previousBearish && current.open <= previous.close && current.close >= previous.open && currentBody > previousBody;
+  const bearishEngulfing = bearish && previousBullish && current.open >= previous.close && current.close <= previous.open && currentBody > previousBody;
+  const bullishPin = bullish && lowerWick >= currentBody * 2 && upperWick <= currentRange * 0.28;
+  const bearishPin = bearish && upperWick >= currentBody * 2 && lowerWick <= currentRange * 0.28;
+  const insideBar = current.high < previous.high && current.low > previous.low;
+
+  if (bullishEngulfing || bullishPin || (insideBar && current.close > previous.close)) return 'buy';
+  if (bearishEngulfing || bearishPin || (insideBar && current.close < previous.close)) return 'sell';
+  return 'flat';
+}
+
+function horizontalReactionSignal(
+  candles: Candle[],
+  index: number,
+  lookback: number,
+  tolerance: number,
+): { buy: boolean; sell: boolean; resistance: number; support: number; resistanceTouches: number; supportTouches: number } {
+  if (index < 2) return { buy: false, sell: false, resistance: 0, support: 0, resistanceTouches: 0, supportTouches: 0 };
+  const window = candles.slice(Math.max(0, index - lookback), index);
+  if (window.length < Math.min(20, lookback)) return { buy: false, sell: false, resistance: 0, support: 0, resistanceTouches: 0, supportTouches: 0 };
+
+  const resistance = Math.max(...window.map((candle) => candle.high));
+  const support = Math.min(...window.map((candle) => candle.low));
+  const resistanceTouches = window.filter((candle) => Math.abs(candle.high - resistance) <= tolerance || Math.abs(candle.close - resistance) <= tolerance).length;
+  const supportTouches = window.filter((candle) => Math.abs(candle.low - support) <= tolerance || Math.abs(candle.close - support) <= tolerance).length;
+  const close = candles[index].close;
+
+  return {
+    buy: resistanceTouches >= 2 && close > resistance,
+    sell: supportTouches >= 2 && close < support,
+    resistance,
+    support,
+    resistanceTouches,
+    supportTouches,
+  };
+}
+
+function zeroWeightedScore(items: {
+  mtf: boolean;
+  dow: boolean;
+  horizontal: boolean;
+  volume: boolean;
+  atr: boolean;
+  ema: boolean;
+  adx: boolean;
+  rsi: boolean;
+  candle: boolean;
+  riskReward: boolean;
+}, disabledConditions: ZeroConditionKey[] = []): number {
+  const weights = zeroConditionWeights();
+
+  return Object.entries(weights).reduce((score, [key, weight]) => {
+    if (disabledConditions.includes(key as ZeroConditionKey)) return score;
+    return score + (items[key as keyof typeof items] ? weight : 0);
+  }, 0);
+}
+
+function zeroOptimizationConditions(): Array<{ key: ZeroConditionKey; label: string; rank: 'S' | 'A' }> {
+  return [
+    { key: 'mtf', label: 'MTF aligned', rank: 'S' },
+    { key: 'dow', label: 'Dow structure', rank: 'S' },
+    { key: 'horizontal', label: 'Horizontal break', rank: 'S' },
+    { key: 'volume', label: 'Volume confirmed', rank: 'S' },
+    { key: 'atr', label: 'ATR active', rank: 'S' },
+    { key: 'ema', label: 'EMA20/75', rank: 'A' },
+    { key: 'adx', label: 'ADX/DMI', rank: 'A' },
+    { key: 'rsi', label: 'RSI 40-60', rank: 'A' },
+    { key: 'candle', label: 'Candle pattern', rank: 'A' },
+    { key: 'riskReward', label: 'Risk reward', rank: 'A' },
+  ];
+}
+
+function zeroConditionWeights(): Record<ZeroConditionKey, number> {
+  return {
+    mtf: 20,
+    dow: 16,
+    horizontal: 14,
+    volume: 10,
+    atr: 10,
+    ema: 8,
+    adx: 7,
+    rsi: 6,
+    candle: 5,
+    riskReward: 4,
+  };
+}
+
+function zeroConditionPass(key: ZeroConditionKey, value: boolean, disabledConditions: ZeroConditionKey[] = []): boolean {
+  return disabledConditions.includes(key) || value;
+}
+
+function zeroAdjustedThreshold(threshold: number, disabledConditions: ZeroConditionKey[] = []): number {
+  if (disabledConditions.length === 0) return threshold;
+  const removedWeight = disabledConditions.reduce((sum, key) => sum + zeroConditionWeights()[key], 0);
+  return Math.max(35, threshold - removedWeight * 0.75);
+}
+
+function zeroSignalDetail(signal: Signal, score: number, confirmations: number, sRank: string[], aRank: string[]): SignalDetail {
+  return {
+    signal,
+    score,
+    grade: zeroGrade(score, sRank.length),
+    confirmations,
+    sRank,
+    aRank,
+    blocks: [],
+  };
+}
+
+function emptySignalDetail(block?: string): SignalDetail {
+  return {
+    signal: 'flat',
+    score: 0,
+    grade: '-',
+    confirmations: 0,
+    sRank: [],
+    aRank: [],
+    blocks: block ? [block] : [],
+  };
+}
+
+function zeroGrade(score: number, sRankCount: number): string {
+  if (score >= 90 && sRankCount >= 5) return 'S';
+  if (score >= 76 && sRankCount >= 4) return 'A';
+  if (score >= 60) return 'B';
+  return 'C';
+}
+
+function conditionNames(items: Array<[string, boolean]>): string[] {
+  return items.filter(([, matched]) => matched).map(([name]) => name);
+}
+
+function zeroBlocks(items: {
+  mtf: boolean;
+  dow: boolean;
+  horizontal: boolean;
+  volume: boolean;
+  atr: boolean;
+  adx: boolean;
+  ema: boolean;
+  score: number;
+  threshold: number;
+}, disabledConditions: ZeroConditionKey[] = []): string[] {
+  const blocks = conditionNames([
+    ['MTF not aligned', !items.mtf && !disabledConditions.includes('mtf')],
+    ['Dow structure missing', !items.dow && !disabledConditions.includes('dow')],
+    ['Horizontal break missing', !items.horizontal && !disabledConditions.includes('horizontal')],
+    ['Volume too low', !items.volume && !disabledConditions.includes('volume')],
+    ['ATR too low', !items.atr && !disabledConditions.includes('atr')],
+    ['ADX below 25', !items.adx && !disabledConditions.includes('adx')],
+    ['EMA20/75 mismatch', !items.ema && !disabledConditions.includes('ema')],
+    ['ZERO score below threshold', items.score < items.threshold],
+  ]);
+  return blocks.length > 0 ? blocks : ['Direction edge not enough'];
+}
+
+function rollingVwap(candles: Candle[], period: number): number[] {
+  return candles.map((_, index) => {
+    const window = candles.slice(Math.max(0, index - period + 1), index + 1);
+    let weightedPrice = 0;
+    let totalVolume = 0;
+
+    window.forEach((candle) => {
+      const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+      const volume = Math.max(candle.volume, 0);
+      weightedPrice += typicalPrice * volume;
+      totalVolume += volume;
+    });
+
+    if (totalVolume > 0) return weightedPrice / totalVolume;
+    return window.reduce((sum, candle) => sum + (candle.high + candle.low + candle.close) / 3, 0) / Math.max(window.length, 1);
+  });
+}
+
+function fibonacciPullbackSignal(candles: Candle[], index: number, lookback: number): Signal {
+  if (index < lookback) return 'flat';
+  const window = candles.slice(index - lookback, index);
+  const high = Math.max(...window.map((candle) => candle.high));
+  const low = Math.min(...window.map((candle) => candle.low));
+  const range = high - low;
+  if (!Number.isFinite(range) || range <= 0) return 'flat';
+
+  const close = candles[index].close;
+  const previousClose = candles[index - 1]?.close ?? close;
+  const retrace382FromHigh = high - range * 0.382;
+  const retrace618FromHigh = high - range * 0.618;
+  const retrace382FromLow = low + range * 0.382;
+  const retrace618FromLow = low + range * 0.618;
+  const inBuyZone = close >= retrace618FromHigh && close <= retrace382FromHigh;
+  const inSellZone = close >= retrace382FromLow && close <= retrace618FromLow;
+
+  if (inBuyZone && close > previousClose) return 'buy';
+  if (inSellZone && close < previousClose) return 'sell';
+  return 'flat';
+}
+
+function multiTimeframeBias(candles: Candle[], sourceTimeframe: Timeframe): Signal[] {
+  const sourceMinutes = timeframeMinutes(sourceTimeframe);
+  if (!sourceMinutes) return candles.map(() => 'flat');
+
+  const strictTargets = [15, 60, 240];
+  const targets = strictTargets.filter((target) => target >= sourceMinutes);
+  if (targets.length === 0) return candles.map(() => 'flat');
+
+  const targetBiases = targets.map((target) => aggregatedTimeframeBias(candles, sourceMinutes, target));
+  return candles.map((_, index) => {
+    const votes = targetBiases.map((biases) => biases[index]);
+    if (votes.length !== targets.length || votes.some((bias) => bias === 'flat')) return 'flat';
+    if (votes.every((bias) => bias === 'buy')) return 'buy';
+    if (votes.every((bias) => bias === 'sell')) return 'sell';
+    return 'flat';
+  });
+}
+
+function aggregatedTimeframeBias(candles: Candle[], sourceMinutes: number, targetMinutes: number): Signal[] {
+  const groupSize = Math.max(1, Math.round(targetMinutes / sourceMinutes));
+  const aggregatedCloses: number[] = [];
+  candles.forEach((candle, index) => {
+    if ((index + 1) % groupSize === 0 || index === candles.length - 1) aggregatedCloses.push(candle.close);
+  });
+
+  const fast = ema(aggregatedCloses, 20);
+  const slow = ema(aggregatedCloses, 75);
+  const longMa = sma(aggregatedCloses, 200);
+  const aggregatedBias = aggregatedCloses.map((close, index) => {
+    const trendBase = longMa[index] || slow[index] || close;
+    if (close > trendBase && fast[index] > slow[index]) return 'buy';
+    if (close < trendBase && fast[index] < slow[index]) return 'sell';
+    return 'flat';
+  });
+
+  return candles.map((_, index) => aggregatedBias[Math.min(Math.floor(index / groupSize), aggregatedBias.length - 1)] ?? 'flat');
+}
+
+function timeframeMinutes(timeframe: Timeframe): number {
+  const table: Record<Timeframe, number> = {
+    M1: 1,
+    M5: 5,
+    M15: 15,
+    M30: 30,
+    H1: 60,
+    H4: 240,
+    D1: 1440,
+    W1: 10080,
+    MN: 43200,
+  };
+  return table[timeframe];
+}
+
+function buildNewsGuardWindows(settings: BacktestSettings): Array<{ start: number; end: number }> {
+  if (!settings.newsGuardEnabled || !settings.newsEvents.trim()) return [];
+  const guardMs = Math.max(0, settings.newsGuardMinutes) * 60 * 1000;
+  return settings.newsEvents
+    .split(/\r?\n/)
+    .map((line) => parseNewsEventTime(line))
+    .filter((time): time is number => Number.isFinite(time))
+    .map((time) => ({ start: time - guardMs, end: time + guardMs }));
+}
+
+function parseNewsEventTime(line: string): number {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return Number.NaN;
+  const match = trimmed.match(/^(\d{4}[-/]\d{1,2}[-/]\d{1,2})(?:[ T,]+)(\d{1,2}:\d{2})/);
+  if (!match) return Number.NaN;
+  const normalized = `${match[1].replace(/\//g, '-')}T${match[2]}`;
+  const time = new Date(normalized).getTime();
+  return Number.isFinite(time) ? time : Number.NaN;
+}
+
+function isNewsGuarded(value: string, windows: Array<{ start: number; end: number }>): boolean {
+  if (windows.length === 0) return false;
+  const time = parseCandleDate(value).getTime();
+  if (!Number.isFinite(time)) return false;
+  return windows.some((window) => time >= window.start && time <= window.end);
 }
 
 function sma(values: number[], period: number): number[] {
@@ -1346,6 +2376,7 @@ function defaultType(strategy: StrategyKind): LogicType {
   if (strategy === 'rsiReversal') return 'Reversal';
   if (strategy === 'breakout') return 'Breakout';
   if (strategy === 'bbReversal') return 'Volatility';
+  if (strategy === 'zeroLogic') return 'Trend';
   return 'Trend';
 }
 
@@ -1354,7 +2385,8 @@ function readStrategy(value: unknown): StrategyKind | undefined {
     value === 'rsiReversal' ||
     value === 'macdCross' ||
     value === 'bbReversal' ||
-    value === 'breakout'
+    value === 'breakout' ||
+    value === 'zeroLogic'
     ? value
     : undefined;
 }
@@ -1369,6 +2401,22 @@ function readString(value: unknown): string {
 
 function readNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeLogicParams(params: Record<string, unknown>): LogicParams {
+  return {
+    ...defaultParams,
+    ...params,
+    zeroDisabledConditions: uniqueZeroConditions(Array.isArray(params.zeroDisabledConditions) ? params.zeroDisabledConditions : []),
+  } as LogicParams;
+}
+
+function uniqueZeroConditions(values: unknown[]): ZeroConditionKey[] {
+  return Array.from(new Set(values.filter(isZeroConditionKey)));
+}
+
+function isZeroConditionKey(value: unknown): value is ZeroConditionKey {
+  return typeof value === 'string' && zeroOptimizationConditions().some((condition) => condition.key === value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

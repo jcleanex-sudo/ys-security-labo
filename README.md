@@ -2,7 +2,7 @@
 
 AI FX LAB is a browser-based FX strategy research platform. It imports OHLCV CSV data, runs multiple backtest logics, compares performance, and evaluates whether a strategy is likely to remain reproducible outside the original sample.
 
-Ver3.4 Stable focuses on validation quality. It does not implement AI prediction, automated trading, or live MT5 connectivity.
+Ver4.0 adds AI Logic Selector, a rule-based AI layer that reads Ver3.4 validation results and selects which strategies should be adopted, watched, or rejected. It does not implement AI price prediction, automated trading, or live MT5 connectivity.
 
 ## Getting Started
 
@@ -53,10 +53,13 @@ Requirements:
 - Rows should be sorted by time
 - Duplicate timestamps and missing candles are reported by the CSV quality checker
 
-MT5 users can export compatible CSV data with:
+MT4 and MT5 users can export compatible CSV data with:
 
 ```text
+mt4/ExportRatesToCsv.mq4
+mt4/AIFXLAB_LiveCsvBridge.mq4
 mt5/ExportRatesToCsv.mq5
+mt5/AIFXLAB_LiveCsvBridge.mq5
 ```
 
 ## Implemented Features
@@ -69,8 +72,49 @@ mt5/ExportRatesToCsv.mq5
 - Trade history export
 - Result JSON/CSV export
 - CSV quality validation
-- MT5 CSV export guide and MQL5 exporter
+- MT4 / MT5 CSV export guide and MQL4/MQL5 exporters
+- MT4 / MT5 Live CSV Bridge EA for signal-only sample collection
 - Dashboard with equity curve, drawdown, monthly profit, and recommended logic
+- AI Logic Selector for Adopt, Watch, and Reject decisions
+- Operation Mode for realtime-style sample replay and signal logging
+
+## MT4 / MT5 CSV Bridge
+
+AI FX LAB supports CSV import from both MetaTrader 4 and MetaTrader 5.
+
+- MT4 exporter: `mt4/ExportRatesToCsv.mq4`
+- MT5 exporter: `mt5/ExportRatesToCsv.mq5`
+- MT4 live bridge EA: `mt4/AIFXLAB_LiveCsvBridge.mq4`
+- MT5 live bridge EA: `mt5/AIFXLAB_LiveCsvBridge.mq5`
+- Output format: `time,open,high,low,close,volume`
+- Output file example: `AIFXLAB_USDJPY_H1_20250101_20251231.csv`
+
+The manual scripts export historical data. The live bridge EAs refresh `AIFXLAB_LIVE_SYMBOL_TIMEFRAME.csv` on a timer for Operation Mode. They do not execute trades, send orders, or let AI FX LAB control a broker account.
+
+## Ver4.0 Additions
+
+Ver4.0 adds AI Logic Selector:
+
+- New `AI Selector` screen
+- Rule-based AI selection without external AI APIs
+- Adoption status per logic: Adopt, Watch, Reject
+- AI comments for each logic
+- Adoption and rejection reasons
+- Evaluation using Reliability Score, PF, max DD, Out-of-Sample results, Monte Carlo results, trade count, and Market Regime fit
+- Dashboard metrics for AI recommended logic count, Adopt count, Watch count, Reject count, and current top AI logic
+
+## Realtime Sample Operation
+
+Operation Mode replays loaded sample candles like realtime market data. It generates signal-only alerts from the selected logic and records a downloadable sample log.
+
+- Start, pause, and reset sample replay
+- Live CSV Feed for MT4/MT5-updated CSV snapshots
+- Signal-only MT4/MT5 Live CSV Bridge EA support
+- Real FX chart image panel for MT4, MT5, TradingView, or broker screenshots
+- Current signal, price, TP, SL, confidence, and market regime
+- Realtime-style signal log
+- `operation-sample-signals.csv` export
+- No order execution and no broker connection
 
 ## Ver3.4 Additions
 
@@ -94,11 +138,9 @@ Ver3.4 adds validation tools for selecting strategies that are more likely to re
 
 ## Roadmap
 
-- Ver4: AI Logic Selector
-  - AI reads Ver3.4 validation results
-  - AI selects which logic to adopt
-  - AI does not directly predict the market
 - Future improvements
+  - Explainable AI Selector tuning
+  - AI selection history and report export
   - Saved research projects
   - More robust report templates
   - Parameter optimization history

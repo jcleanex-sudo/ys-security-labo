@@ -1,75 +1,86 @@
 # AI FX LAB MT5 CSV Bridge
 
-`ExportRatesToCsv.mq5` は、MetaTrader 5の過去チャートデータをAI FX LABで読み込めるCSV形式へ書き出すスクリプトです。
+AI FX LAB can read MT5 data through CSV files. This folder includes two options:
 
-今回はMT5 API接続や自動売買は行いません。
+- `ExportRatesToCsv.mq5`: manual historical CSV export script
+- `AIFXLAB_LiveCsvBridge.mq5`: signal-only Expert Advisor that refreshes a live CSV file on a timer
 
-## CSV形式
+Neither file sends orders, modifies positions, closes trades, or connects AI FX LAB directly to a broker account.
 
-出力ヘッダー:
+## CSV Format
+
+Both exporters create this header:
 
 ```csv
 time,open,high,low,close,volume
 ```
 
-出力ファイル名:
+Example row:
+
+```csv
+2025-01-01 00:00,150.123,150.300,149.980,150.210,1200
+```
+
+AI FX LAB reads this timestamp format directly.
+
+## Manual Historical Export
+
+Use this when you want a fixed backtest sample.
+
+1. Open MT5.
+2. Select `File > Open Data Folder`.
+3. Copy `ExportRatesToCsv.mq5` into `MQL5 > Scripts`.
+4. Open MetaEditor and compile `Scripts > ExportRatesToCsv.mq5`.
+5. Drag `ExportRatesToCsv` from `Navigator > Scripts` onto a chart.
+6. Set symbol, timeframe, start date, and end date.
+7. Open the generated file from `MQL5 > Files`.
+
+Output file name:
 
 ```text
 AIFXLAB_SYMBOL_TIMEFRAME_START_END.csv
 ```
 
-例:
+## Live CSV Bridge EA
+
+Use this when you want AI FX LAB Operation Mode to keep reading the latest MT5 bars.
+
+1. Open MT5.
+2. Select `File > Open Data Folder`.
+3. Copy `AIFXLAB_LiveCsvBridge.mq5` into `MQL5 > Experts`.
+4. Open MetaEditor and compile `Experts > AIFXLAB_LiveCsvBridge.mq5`.
+5. Drag `AIFXLAB_LiveCsvBridge` from `Navigator > Expert Advisors` onto the chart.
+6. Keep `Algo Trading` enabled so the EA timer can run.
+7. Confirm the CSV is updating in `MQL5 > Files`.
+8. In AI FX LAB, open `Operation` and click `Select Live CSV`.
+9. Select the generated `AIFXLAB_LIVE_...csv` file.
+
+Live output file name:
 
 ```text
-AIFXLAB_USDJPY_H1_20250101_20251231.csv
+AIFXLAB_LIVE_SYMBOL_TIMEFRAME.csv
 ```
 
-## 設置方法
+Example:
 
-1. MT5を開きます。
-2. メニューから `File > Open Data Folder` を開きます。
-3. `MQL5 > Scripts` フォルダを開きます。
-4. `ExportRatesToCsv.mq5` を `Scripts` フォルダへ配置します。
+```text
+AIFXLAB_LIVE_USDJPY_H1.csv
+```
 
-## コンパイル方法
+## Live EA Inputs
 
-1. MT5で `Tools > MetaQuotes Language Editor` を開きます。
-2. `Scripts > ExportRatesToCsv.mq5` を開きます。
-3. `Compile` を押します。
-4. エラーがなければ `ExportRatesToCsv.ex5` が生成されます。
-
-## CSV出力方法
-
-1. MT5の `Navigator` から `Scripts` を開きます。
-2. `ExportRatesToCsv` をチャートへドラッグします。
-3. Inputsで以下を指定します。
-
-| Input | 内容 |
+| Input | Description |
 | --- | --- |
-| `InpSymbol` | 出力するSymbol。例: `USDJPY`, `EURUSD`, `XAUUSD` |
-| `InpTimeframe` | 出力する時間足。例: `PERIOD_M1`, `PERIOD_H1`, `PERIOD_D1` |
-| `InpStartDate` | 開始日時 |
-| `InpEndDate` | 終了日時 |
+| `InpSymbol` | Symbol to export when `InpUseChartSymbol` is false |
+| `InpTimeframe` | Timeframe to export when `InpUseChartTimeframe` is false |
+| `InpBarsToExport` | Number of recent bars written to CSV |
+| `InpUpdateSeconds` | CSV refresh interval |
+| `InpUseChartSymbol` | Use the chart symbol |
+| `InpUseChartTimeframe` | Use the chart timeframe |
 
-4. 実行後、CSVは `MQL5 > Files` に保存されます。
+## Notes
 
-保存先を開くには、MT5で `File > Open Data Folder` を開き、`MQL5 > Files` を確認してください。
-
-## AI FX LABへの読み込み方法
-
-1. AI FX LABを開きます。
-2. `Data Source` は `CSV` を選択します。
-3. `CSV読み込み` から、MT5が出力したCSVを選択します。
-4. Data Managerで以下を確認します。
-   - データ数
-   - 開始日
-   - 終了日
-   - 欠損データ
-5. Backtest / Ranking / Trade Historyで検証します。
-
-## 注意
-
-- MT5のヒストリーデータが不足している場合、出力本数が少なくなることがあります。
-- 先にMT5上で対象SymbolとTimeframeのチャートを開き、必要な期間までスクロールしてヒストリーを取得しておくと安定します。
-- 出力CSVの時刻は `YYYY-MM-DD HH:MM` 形式です。
-- `volume` はMT5の `tick_volume` を使用しています。
+- This is a sample collection bridge, not an auto-trading EA.
+- The EA contains no `CTrade`, `OrderSend`, position modification, or close logic.
+- `volume` uses MT5 `tick_volume`.
+- If rows are missing, open the symbol/timeframe chart in MT5 and load more history first.

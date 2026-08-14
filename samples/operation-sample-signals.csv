@@ -1,0 +1,30 @@
+Received,Market Time,Logic,Signal,Price,TP Price,TP Pips,SL Price,SL Pips,Regime,Confidence,Note
+2026/07/02 20:24,2025-01-04 16:00,Breakout,Flat,154.006,154.006,70 pips,154.006,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 15:00,Breakout,Flat,153.994,153.994,70 pips,153.994,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 14:00,Breakout,Flat,153.939,153.939,70 pips,153.939,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 13:00,Breakout,Flat,153.799,153.799,70 pips,153.799,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 12:00,Breakout,Flat,153.754,153.754,70 pips,153.754,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 11:00,Breakout,Flat,153.805,153.805,70 pips,153.805,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 10:00,Breakout,Flat,153.773,153.773,70 pips,153.773,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 09:00,Breakout,Flat,153.708,153.708,70 pips,153.708,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 08:00,Breakout,Flat,153.777,153.777,70 pips,153.777,34 pips,Low Volatility,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 07:00,Breakout,Flat,153.890,153.890,70 pips,153.890,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 06:00,Breakout,Flat,153.904,153.904,70 pips,153.904,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 05:00,Breakout,Flat,153.949,153.949,70 pips,153.949,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 04:00,Breakout,Flat,154.134,154.134,70 pips,154.134,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 03:00,Breakout,Flat,154.303,154.303,70 pips,154.303,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 02:00,Breakout,Flat,154.386,154.386,70 pips,154.386,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-04 01:00,Breakout,Sell,154.559,153.859,70 pips,154.899,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-04 00:00,Breakout,Flat,154.843,154.843,70 pips,154.843,34 pips,Trend,0%,No signal. Monitoring only.
+2026/07/02 20:24,2025-01-03 23:00,Breakout,Sell,155.060,154.360,70 pips,155.400,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 22:00,Breakout,Sell,155.629,154.929,70 pips,155.969,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 21:00,Breakout,Sell,155.924,155.224,70 pips,156.264,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 20:00,Breakout,Sell,156.279,155.579,70 pips,156.619,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 19:00,Breakout,Sell,156.533,155.833,70 pips,156.873,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 18:00,Breakout,Sell,156.792,156.092,70 pips,157.132,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 17:00,Breakout,Sell,157.187,156.487,70 pips,157.527,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 16:00,Breakout,Sell,157.572,156.872,70 pips,157.912,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:24,2025-01-03 15:00,Breakout,Sell,157.854,157.154,70 pips,158.194,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:23,2025-01-03 14:00,Breakout,Sell,158.196,157.496,70 pips,158.536,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:23,2025-01-03 13:00,Breakout,Sell,158.645,157.945,70 pips,158.985,34 pips,Trend,75%,Signal alert only. No auto trade executed.
+2026/07/02 20:23,2025-01-03 12:00,Breakout,Sell,159.023,158.323,70 pips,159.363,34 pips,Trend,75%,Signal alert only. No auto trade executed.

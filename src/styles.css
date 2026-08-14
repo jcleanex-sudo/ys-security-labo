@@ -290,7 +290,7 @@ code {
 
   .source-switch {
     display: inline-grid;
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, minmax(92px, 1fr));
     gap: 8px;
     border: 1px solid rgb(255 255 255 / 0.09);
     border-radius: 8px;
@@ -658,6 +658,7 @@ code {
   }
 
   .chart-shell,
+  .candle-chart-shell,
   .bar-chart {
     margin-top: 18px;
     border: 1px solid rgb(255 255 255 / 0.09);
@@ -670,6 +671,65 @@ code {
     display: block;
     width: 100%;
     height: 220px;
+  }
+
+  .candle-chart-shell {
+    overflow-x: auto;
+  }
+
+  .candle-chart-shell svg {
+    display: block;
+    width: 100%;
+    min-width: 760px;
+    height: 360px;
+  }
+
+  .real-chart-shell,
+  .real-chart-empty {
+    position: relative;
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 0.09);
+    border-radius: 8px;
+    background: rgb(2 6 23 / 0.42);
+  }
+
+  .real-chart-shell img {
+    display: block;
+    width: 100%;
+    height: 360px;
+    object-fit: contain;
+    background: #020617;
+  }
+
+  .real-chart-overlay {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    display: grid;
+    gap: 3px;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 8px;
+    background: rgb(2 6 23 / 0.82);
+    padding: 10px 12px;
+    color: #dbeafe;
+    font-size: 0.78rem;
+    font-weight: 850;
+    backdrop-filter: blur(10px);
+  }
+
+  .real-chart-overlay strong {
+    color: #67e8f9;
+    font-size: 1rem;
+    font-weight: 950;
+  }
+
+  .real-chart-empty {
+    display: grid;
+    place-items: center;
+    padding: 28px;
+    text-align: center;
   }
 
   .chart-axis {

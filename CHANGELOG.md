@@ -1,5 +1,24 @@
 # Changelog
 
+## Ver4.0
+
+- Added `AI Selector` tab.
+- Added rule-based AI Logic Selector without external AI APIs.
+- Added Adopt, Watch, and Reject status per logic.
+- Added AI comments, adoption reasons, and exclusion reasons.
+- Added AI scoring based on Reliability Score, Out-of-Sample results, Monte Carlo stability, max DD, PF, trade count, and Market Regime suitability.
+- Added AI Selector summary metrics to the Dashboard.
+- Updated UI version label to `Ver4.0 AI Selector`.
+- Kept automated trading and MT5 realtime connectivity out of scope.
+- Added Operation Mode for realtime-style sample replay.
+- Added signal-only sample logging with current price, TP, SL, regime, confidence, and CSV export.
+- Added Live CSV Feed controls for MT4/MT5-updated CSV snapshots in Operation Mode.
+- Added Real FX chart image panel synced with current signal, TP, SL, and pips.
+- Added MT4 CSV Bridge with `mt4/ExportRatesToCsv.mq4`.
+- Added signal-only MT4 Live CSV Bridge EA with `mt4/AIFXLAB_LiveCsvBridge.mq4`.
+- Added signal-only MT5 Live CSV Bridge EA with `mt5/AIFXLAB_LiveCsvBridge.mq5`.
+- Updated Data Bridge UI to support `CSV`, `MT4`, and `MT5` sources.
+
 ## Ver3.4 Stable
 
 - Added Walk Forward Test for repeated training and validation windows.
