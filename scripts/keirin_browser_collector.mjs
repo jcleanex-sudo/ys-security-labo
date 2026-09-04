@@ -301,17 +301,18 @@ export async function collectVenue(browser, venue, config) {
           await oddsButton.click({ force: true });
           await pause(320);
         }
+        const riderCount = oddsData.numbers.length || basic.riders.length;
+        const trifectaReady = Object.keys(oddsData.odds).length === expectedOddsCount(riderCount);
         const trioButton = tab.playwright.locator("#btnKake3Renhuku");
-        const trioData = await trioButton.count() === 1
+        const trioData = trifectaReady && await trioButton.count() === 1
           ? await extractTrioOddsUntilComplete(tab, trioButton, oddsData.numbers.length || basic.riders.length)
           : { odds: {}, updatedAt: "" };
-        const riderCount = oddsData.numbers.length || basic.riders.length;
         const exactaButton = tab.playwright.locator("#btnKake2Syatan");
-        const exactaData = await exactaButton.count() === 1
+        const exactaData = trifectaReady && await exactaButton.count() === 1
           ? await extractTwoRiderOddsUntilComplete(tab, exactaButton, riderCount, false)
           : { odds: {}, updatedAt: "" };
         const quinellaButton = tab.playwright.locator("#btnKake2Syahuku");
-        const quinellaData = await quinellaButton.count() === 1
+        const quinellaData = trifectaReady && await quinellaButton.count() === 1
           ? await extractTwoRiderOddsUntilComplete(tab, quinellaButton, riderCount, true)
           : { odds: {}, updatedAt: "" };
         const riderMap = new Map((basic.riders || []).filter((rider) => rider.number).map((rider) => [rider.number, rider]));
