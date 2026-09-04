@@ -60,12 +60,12 @@ test("two-rider candidates support exacta and quinella", () => {
   assert.ok(quinella[0].modelProbability > exacta[0].modelProbability);
 });
 
-test("official odds ceiling is treated as unavailable", () => {
+test("official odds ceiling blocks only that ticket", () => {
   const scores = [{ number: 1, score: 2 }, { number: 2, score: 1 }, { number: 3, score: 0 }];
   const odds = { "1-2": 2.5, "1-3": 9999.9, "2-3": 7 };
   const candidates = buildTwoRiderCandidates(scores, odds, true);
-  assert.ok(candidates.every((ticket) => ticket.odds === null));
-  assert.ok(candidates.every((ticket) => ticket.status === "DATA BLOCKED"));
+  assert.equal(candidates.find((ticket) => ticket.combo === "1-3").status, "DATA BLOCKED");
+  assert.ok(candidates.filter((ticket) => ticket.combo !== "1-3").every((ticket) => Number.isFinite(ticket.odds)));
 });
 
 test("market analysis returns an index and ten candidates", () => {

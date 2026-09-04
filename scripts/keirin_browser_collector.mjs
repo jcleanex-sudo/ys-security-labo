@@ -118,8 +118,7 @@ async function extractOdds(tab) {
     (selectors.length ? document.querySelectorAll(selectors.join(",")) : []).forEach((element) => {
       const match = element.id.match(/^OZZ([1-9])([1-9])([1-9])$/);
       const value = (element.textContent || "").trim().replace(/,/g, "");
-      const numericValue = Number(value);
-      if (match && /^\d+(?:\.\d+)?$/.test(value) && numericValue > 1 && numericValue < 9999.9) oddsByFirst[match[1]][`${match[1]}-${match[2]}-${match[3]}`] = numericValue;
+      if (match && /^\d+(?:\.\d+)?$/.test(value)) oddsByFirst[match[1]][`${match[1]}-${match[2]}-${match[3]}`] = Number(value);
     });
     const updateMatch = bodyText.match(/(\d{2}:\d{2})\s*現在/);
     const votesMatch = (document.querySelector("table.htb_tbl")?.innerText || "").match(/([\d,]+)/);
@@ -167,7 +166,7 @@ async function extractTrioOdds(tab) {
     oddsElements.forEach((element) => {
       const match = element.id.match(/^OZZ([1-9])([1-9])([1-9])$/);
       const value = (element.textContent || "").trim().replace(/,/g, "");
-      if (!match || !/^\d+(?:\.\d+)?$/.test(value) || Number(value) <= 1 || Number(value) >= 9999.9) return;
+      if (!match || !/^\d+(?:\.\d+)?$/.test(value)) return;
       const numbers = match.slice(1).map(Number);
       if (numbers[0] < numbers[1] && numbers[1] < numbers[2]) odds[numbers.join("-")] = Number(value);
     });
@@ -197,7 +196,7 @@ async function extractTwoRiderOdds(tab, unordered) {
     oddsElements.forEach((element) => {
       const match = element.id.match(/^OZZ([1-9])([1-9])$/);
       const value = (element.textContent || "").trim().replace(/,/g, "");
-      if (!match || !/^\d+(?:\.\d+)?$/.test(value) || Number(value) <= 1 || Number(value) >= 9999.9) return;
+      if (!match || !/^\d+(?:\.\d+)?$/.test(value)) return;
       const numbers = match.slice(1).map(Number);
       if (!isUnordered || numbers[0] < numbers[1]) odds[numbers.join("-")] = Number(value);
     });

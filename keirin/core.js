@@ -26,7 +26,7 @@ export function keirinTicketEdge(riders,ticket,odds,cost=2) {
 }
 
 export function analyzeMarketOdds(odds, status = "OK") {
-  const entries = Object.entries(odds || {}).map(([combo, value]) => ({ combo, odds: Number(value), numbers: combo.split("-").map(Number) })).filter((item) => item.odds > 1).sort((a, b) => a.odds - b.odds);
+  const entries = Object.entries(odds || {}).map(([combo, value]) => ({ combo, odds: Number(value), numbers: combo.split("-").map(Number) })).filter((item) => isUsableOfficialOdds(item.odds)).sort((a, b) => a.odds - b.odds);
   if (!entries.length || status !== "OK") return { index: 0, grade: "--", tickets: [], scenario: "オッズ未取得のためAI予想展開を作成できません。" };
   const rawTotal = entries.reduce((sum, item) => sum + 1 / item.odds, 0);
   const weighted = entries.map((item) => ({ ...item, weight: (1 / item.odds) / rawTotal }));
@@ -160,8 +160,9 @@ function permutations3(numbers) {
 export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
   const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
   const expectedCount = numbers.length * (numbers.length - 1) * (numbers.length - 2) / 6;
-  const suppliedOdds = Object.entries(trioOdds || {}).filter(([, value]) => isUsableOfficialOdds(value));
-  const oddsComplete = expectedCount > 0 && suppliedOdds.length === expectedCount;
+  const allOdds = Object.entries(trioOdds || {});
+  const suppliedOdds = allOdds.filter(([, value]) => isUsableOfficialOdds(value));
+  const oddsComplete = expectedCount > 0 && allOdds.length === expectedCount;
   const rawMarketTotal = oddsComplete ? suppliedOdds.reduce((sum, [, odds]) => sum + 1 / Number(odds), 0) : 0;
   const candidates = [];
   for (let first = 0; first < numbers.length - 2; first += 1) {
@@ -171,7 +172,7 @@ export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
         const modelProbability = permutations3(combination)
           .reduce((sum, order) => sum + plackettLuceProbability(scores, order), 0);
         const combo = combination.join("-");
-        const odds = oddsComplete ? Number(trioOdds[combo]) : null;
+        const odds = oddsComplete && isUsableOfficialOdds(trioOdds[combo]) ? Number(trioOdds[combo]) : null;
         const rawMarketProbability = odds ? 1 / odds : null;
         const marketProbability = odds ? rawMarketProbability / rawMarketTotal : null;
         const netEdge = odds ? (modelProbability - rawMarketProbability) * 100 - Number(safetyMargin || 0) : null;
@@ -197,8 +198,9 @@ export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
 export function buildTwoRiderCandidates(scores, oddsSource = null, unordered = false, safetyMargin = 2) {
   const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
   const expectedCount = unordered ? numbers.length * (numbers.length - 1) / 2 : numbers.length * (numbers.length - 1);
-  const suppliedOdds = Object.entries(oddsSource || {}).filter(([, value]) => isUsableOfficialOdds(value));
-  const oddsComplete = expectedCount > 0 && suppliedOdds.length === expectedCount;
+  const allOdds = Object.entries(oddsSource || {});
+  const suppliedOdds = allOdds.filter(([, value]) => isUsableOfficialOdds(value));
+  const oddsComplete = expectedCount > 0 && allOdds.length === expectedCount;
   const rawMarketTotal = oddsComplete ? suppliedOdds.reduce((sum, [, odds]) => sum + 1 / Number(odds), 0) : 0;
   const candidates = [];
   for (const first of numbers) for (const second of numbers) {
@@ -208,7 +210,7 @@ export function buildTwoRiderCandidates(scores, oddsSource = null, unordered = f
       ? plackettLuceProbability(scores, combination) + plackettLuceProbability(scores, [second, first])
       : plackettLuceProbability(scores, combination);
     const combo = combination.join("-");
-    const odds = oddsComplete ? Number(oddsSource[combo]) : null;
+    const odds = oddsComplete && isUsableOfficialOdds(oddsSource[combo]) ? Number(oddsSource[combo]) : null;
     const rawMarketProbability = odds ? 1 / odds : null;
     const marketProbability = odds ? rawMarketProbability / rawMarketTotal : null;
     const netEdge = odds ? (modelProbability - rawMarketProbability) * 100 - Number(safetyMargin || 0) : null;
@@ -251,7 +253,7 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     combo,
     odds: Number(value),
     numbers: combo.split("-").map(Number),
-  })).filter((item) => item.odds > 1);
+  })).filter((item) => isUsableOfficialOdds(item.odds));
   const rawMarketTotal = entries.reduce((sum, item) => sum + 1 / item.odds, 0);
   const marketEntries = entries.map((item) => ({ ...item, marketProbability: (1 / item.odds) / rawMarketTotal }));
   const riders = (race.riders || []).filter((rider) => Number.isInteger(Number(rider.number)));
@@ -280,9 +282,8 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     };
   }
   const modelRaw = marketEntries.map((entry) => plackettLuceProbability(scores, entry.numbers));
-  const modelTotal = modelRaw.reduce((sum, probability) => sum + probability, 0) || 1;
   const tickets = marketEntries.map((entry, index) => {
-    const modelProbability = modelRaw[index] / modelTotal;
+    const modelProbability = modelRaw[index];
     const rawMarketProbability = 1 / entry.odds;
     const netEdge = (modelProbability - rawMarketProbability) * 100 - Number(safetyMargin || 0);
     const expectedProfitYen = modelProbability * entry.odds * 100 - 100;
