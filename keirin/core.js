@@ -151,6 +151,37 @@ function plackettLuceProbability(scores, numbers, temperature = 0.65) {
   return probability;
 }
 
+function permutations3(numbers) {
+  const [a, b, c] = numbers;
+  return [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]];
+}
+
+export function buildTrioCandidates(scores) {
+  const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
+  const candidates = [];
+  for (let first = 0; first < numbers.length - 2; first += 1) {
+    for (let second = first + 1; second < numbers.length - 1; second += 1) {
+      for (let third = second + 1; third < numbers.length; third += 1) {
+        const combination = [numbers[first], numbers[second], numbers[third]];
+        const modelProbability = permutations3(combination)
+          .reduce((sum, order) => sum + plackettLuceProbability(scores, order), 0);
+        candidates.push({
+          betType: "3連複",
+          combo: combination.join("-"),
+          numbers: combination,
+          modelProbability,
+          odds: null,
+          rawMarketProbability: null,
+          netEdge: null,
+          expectedProfitYen: null,
+          status: "WATCH",
+        });
+      }
+    }
+  }
+  return candidates.sort((a, b) => b.modelProbability - a.modelProbability || a.combo.localeCompare(b.combo, "ja", { numeric: true }));
+}
+
 export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const market = analyzeMarketOdds(race?.odds, race?.status);
   if (race?.status !== "OK" || !market.tickets.length) {
@@ -233,6 +264,7 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const index = clamp(Math.round(25 + topWinProbability * 45 + agreement * 0.15 + dataRate * 0.03), 1, 90);
   const grade = index >= 82 ? "S" : index >= 72 ? "A" : index >= 62 ? "B" : "C";
   const ranked = [...tickets].sort((a, b) => b.modelProbability - a.modelProbability || a.odds - b.odds);
+  const trioCandidates = buildTrioCandidates(scores);
   const edgeTickets = [...tickets].filter((ticket) => ticket.netEdge > 0)
     .sort((a, b) => b.netEdge - a.netEdge || b.modelProbability - a.modelProbability);
   const selectionPassed = index >= 75 && agreement >= 75 && dataRate === 100;
@@ -252,9 +284,11 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     riderAssessments,
     selectionPassed,
     recommendation,
-    logicName: "べた子式・競輪複合因子 v1",
+    logicName: "べた子式・競輪3連複中心 v2",
+    primaryBetType: "3連複",
+    primaryTickets: trioCandidates.slice(0, 10),
     tickets: ranked.slice(0, 10),
     edgeTickets: edgeTickets.slice(0, 10),
-    scenario: `べた子式で競走得点・勝率・連対率・決まり手・脚質別展開力を複合評価。公式並び${alignmentOrder.join("-")}を照合し、${modelAxis}番を能力軸候補、6因子一致度${agreement}%・指数${index}。${selectionPassed ? "直前確認まではWATCH" : "公開基準未達のためSKIP"}です。`,
+    scenario: `べた子式で競走得点・勝率・連対率・決まり手・脚質別展開力を複合評価。公式並び${alignmentOrder.join("-")}を照合し、${modelAxis}番を能力軸候補、3連複を中心に選定。6因子一致度${agreement}%・指数${index}。${selectionPassed ? "公式3連複オッズ確認まではWATCH" : "公開基準未達のためSKIP"}です。`,
   };
 }

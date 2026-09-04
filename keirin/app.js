@@ -1,4 +1,4 @@
-import { analyzeKeirinRace } from "./core.js?v=20260904-3";
+import { analyzeKeirinRace } from "./core.js?v=20260904-4";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -102,7 +102,7 @@ function renderRecommendations() {
   $("#recommendedGrid").replaceChildren(...ranked.map((item, position) => {
     const card = document.createElement("article");
     card.className = `recommend-card rank-${position + 1}`;
-    const tickets = item.analysis.tickets.slice(0, 3).map((ticket) => `<span>${ticket.combo} <b>${formatOdds(ticket.odds)}倍 / ${formatOdds(ticket.modelProbability * 100)}%</b></span>`).join("");
+    const tickets = (item.analysis.primaryTickets || item.analysis.tickets).slice(0, 3).map((ticket) => `<span>${ticket.betType || "3連単"} ${ticket.combo} <b>予測${formatOdds(ticket.modelProbability * 100)}%</b></span>`).join("");
     card.innerHTML = `<div class="recommend-rank"><b>${position + 1}</b><span>位</span></div><div class="recommend-body"><div class="race-card-top"><h3>${item.venue.name} ${item.race.number}R</h3><span class="index-badge">${item.analysis.recommendation}・${item.analysis.grade} / ${item.analysis.index}</span></div><p>${item.analysis.scenario}</p><div class="mini-tickets">${tickets}</div><button type="button">このレースを見る</button></div>`;
     card.querySelector("button").onclick = () => { selectedVenueCode = item.venue.code; selectedRaceNumber = item.race.number; syncUrl(); renderAll(); scrollTo({ top: $("#raceDetail").offsetTop - 16, behavior: "smooth" }); };
     return card;
@@ -149,7 +149,7 @@ function renderRaceDetail() {
   const ready = status === "OK";
   $("#blockedMessage").className = `alert blocked-alert${ready ? " ready" : ""}`;
   $("#blockedMessage").textContent = ready
-    ? "三連単オッズの組合せ数を検証済みです。手動評価を入力するとnet edgeを計算できます。"
+    ? "公式三連単オッズは検証済み。予想は3連複中心です。公式3連複オッズ取得まではnet edgeを確定しません。"
     : `DATA BLOCKED：${race?.blockReason || "公式データが未提供または不完全です。"}`;
   $("#riderNumbers").textContent = race?.riderNumbers?.length ? race.riderNumbers.join("・") : "未取得";
   $("#oddsCompleteness").textContent = `${race?.oddsCount ?? 0} / ${race?.expectedOddsCount ?? "--"}`;
@@ -182,13 +182,16 @@ function renderRaceDetail() {
   }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 8; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
   $("#aiIndexValue").textContent = analysis.index ? `${analysis.grade} / ${analysis.index}` : "--";
   $("#aiScenario").textContent = `${analysis.scenario}${analysis.modelReady ? ` データ取得率${analysis.dataRate}%・因子一致度${analysis.agreement}%・confidence ${analysis.confidence}%` : ""}`;
-  $("#aiTenTickets").replaceChildren(...(analysis.tickets.length ? analysis.tickets.map((ticket, index) => {
+  const primaryTickets = analysis.primaryTickets || analysis.tickets;
+  $("#aiTenTickets").replaceChildren(...(primaryTickets.length ? primaryTickets.map((ticket, index) => {
     const item = document.createElement("div");
     item.className = "ten-ticket";
     const detail = ticket.modelProbability === null || ticket.modelProbability === undefined
-      ? `${formatOdds(ticket.odds)}倍`
-      : `${formatOdds(ticket.odds)}倍 / 予測${formatOdds(ticket.modelProbability * 100)}% / 市場${formatOdds(ticket.rawMarketProbability * 100)}% / edge ${ticket.netEdge >= 0 ? "+" : ""}${formatOdds(ticket.netEdge)}% / 100円期待${ticket.expectedProfitYen >= 0 ? "+" : ""}${Math.round(ticket.expectedProfitYen)}円`;
-    item.innerHTML = `<small>${index + 1}</small><b>${ticket.combo}</b><span>${detail}</span>`;
+      ? `${ticket.odds ? `${formatOdds(ticket.odds)}倍` : "オッズ確認待ち"}`
+      : ticket.rawMarketProbability === null
+        ? `予測${formatOdds(ticket.modelProbability * 100)}% / net edge DATA BLOCKED`
+        : `${formatOdds(ticket.odds)}倍 / 予測${formatOdds(ticket.modelProbability * 100)}% / 市場${formatOdds(ticket.rawMarketProbability * 100)}% / edge ${ticket.netEdge >= 0 ? "+" : ""}${formatOdds(ticket.netEdge)}% / 100円期待${ticket.expectedProfitYen >= 0 ? "+" : ""}${Math.round(ticket.expectedProfitYen)}円`;
+    item.innerHTML = `<small>${index + 1}</small><b>${ticket.betType || "3連単"} ${ticket.combo}</b><span>${detail}</span>`;
     return item;
   }) : [Object.assign(document.createElement("div"), { className: "empty", textContent: "候補を表示できません。" })]));
   $("#currentDecision").textContent = race?.status === "OK" && analysis.modelReady ? analysis.recommendation : "DATA BLOCKED";

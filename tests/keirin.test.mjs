@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeKeirinRace, analyzeMarketOdds, buildKeirinFormation, keirinTicketEdge, orderedChance, parseOfficialPerformance, parseOfficialRiderIdentities } from "../keirin/core.js";
+import { analyzeKeirinRace, analyzeMarketOdds, buildKeirinFormation, buildTrioCandidates, keirinTicketEdge, orderedChance, parseOfficialPerformance, parseOfficialRiderIdentities } from "../keirin/core.js";
 
 const riders = [
   { number: 1, score: 40 },
@@ -27,6 +27,16 @@ test("keirin ordered chance uses the remaining rider pool", () => {
 
 test("keirin ticket edge stays blocked until odds are entered", () => {
   assert.equal(keirinTicketEdge(riders, [1, 2, 3], "", 2), null);
+});
+
+test("trio candidates combine all six finishing orders", () => {
+  const scores = [{ number: 1, score: 2 }, { number: 2, score: 1 }, { number: 3, score: 0 }, { number: 4, score: -1 }];
+  const candidates = buildTrioCandidates(scores);
+  assert.equal(candidates.length, 4);
+  assert.equal(candidates[0].betType, "3連複");
+  assert.equal(candidates[0].numbers.length, 3);
+  assert.ok(candidates[0].modelProbability > candidates.at(-1).modelProbability);
+  assert.equal(candidates[0].netEdge, null);
 });
 
 test("market analysis returns an index and ten candidates", () => {
@@ -83,7 +93,10 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   assert.ok(result.agreement >= 0 && result.agreement <= 100);
   assert.ok(Number.isFinite(result.tickets[0].modelProbability));
   assert.ok(Number.isFinite(result.tickets[0].netEdge));
-  assert.equal(result.logicName, "べた子式・競輪複合因子 v1");
+  assert.equal(result.logicName, "べた子式・競輪3連複中心 v2");
+  assert.equal(result.primaryBetType, "3連複");
+  assert.equal(result.primaryTickets.length, 10);
+  assert.ok(result.primaryTickets[0].modelProbability > 0);
   assert.equal(result.modelAxis, 1);
   assert.equal(result.agreement, 100);
   assert.equal(result.riderAssessments.length, 5);
