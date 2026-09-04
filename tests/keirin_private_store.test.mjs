@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { validateRaceRecord, validateResultRecord } from "../scripts/keirin_private_store.mjs";
-import { expectedOddsCount } from "../scripts/keirin_browser_collector.mjs";
+import { expectedOddsCount, expectedTrioOddsCount } from "../scripts/keirin_browser_collector.mjs";
 
 function sampleRecord() {
   return {
@@ -52,4 +52,5 @@ test("DATA BLOCKED can be recorded without rider details", () => {
 
 test("nine riders require 504 trifecta odds", () => {
   assert.equal(expectedOddsCount(9), 504);
+  assert.equal(expectedTrioOddsCount(9), 84);
 });

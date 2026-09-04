@@ -89,6 +89,10 @@ for (const venueDir of venueDirs) {
         ? oddsRiderNumbers
         : (record.riders || []).map((rider) => Number(rider.number)).filter(Number.isInteger),
       odds: record.status === "OK" ? record.odds : {},
+      trioOddsUpdatedAt: record.trio_odds_updated_at || null,
+      trioOddsCount: Object.keys(record.trio_odds || {}).length,
+      expectedTrioOddsCount: record.expected_trio_odds_count ?? null,
+      trioOdds: record.status === "OK" ? (record.trio_odds || {}) : {},
     });
   }
   venues.push({

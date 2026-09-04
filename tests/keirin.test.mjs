@@ -39,6 +39,16 @@ test("trio candidates combine all six finishing orders", () => {
   assert.equal(candidates[0].netEdge, null);
 });
 
+test("trio candidates calculate edge only with complete official odds", () => {
+  const scores = [{ number: 1, score: 2 }, { number: 2, score: 1 }, { number: 3, score: 0 }, { number: 4, score: -1 }];
+  const odds = { "1-2-3": 3.2, "1-2-4": 5.5, "1-3-4": 8.4, "2-3-4": 14.2 };
+  const candidates = buildTrioCandidates(scores, odds);
+  assert.ok(candidates.every((ticket) => Number.isFinite(ticket.netEdge)));
+  assert.ok(candidates.every((ticket) => Number.isFinite(ticket.expectedProfitYen)));
+  const incomplete = buildTrioCandidates(scores, { "1-2-3": 3.2 });
+  assert.ok(incomplete.every((ticket) => ticket.netEdge === null));
+});
+
 test("market analysis returns an index and ten candidates", () => {
   const odds = {};
   let value = 5;
@@ -86,7 +96,9 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
     number,
     performance: { rating: 92 - number, winRate: 30 - number, top2Rate: 50 - number, top3Rate: 70 - number, escapeWins: 8 - number, sprintWins: 6 - number, passWins: 5 - number, markWins: 4 - number, backstretch: 10 - number, home: 8 - number, starts: 6 - number },
   }));
-  const result = analyzeKeirinRace({ status: "OK", odds, riders, alignment: "1 2 3 4 5" });
+  const trioOdds = {};
+  for (let a = 1; a <= 3; a += 1) for (let b = a + 1; b <= 4; b += 1) for (let c = b + 1; c <= 5; c += 1) trioOdds[`${a}-${b}-${c}`] = 5 + a + b + c;
+  const result = analyzeKeirinRace({ status: "OK", odds, trioOdds, riders, alignment: "1 2 3 4 5" });
   assert.equal(result.modelReady, true);
   assert.equal(result.dataRate, 100);
   assert.equal(result.tickets.length, 10);
@@ -97,6 +109,7 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   assert.equal(result.primaryBetType, "3連複");
   assert.equal(result.primaryTickets.length, 10);
   assert.ok(result.primaryTickets[0].modelProbability > 0);
+  assert.equal(result.primaryOddsReady, true);
   assert.equal(result.modelAxis, 1);
   assert.equal(result.agreement, 100);
   assert.equal(result.riderAssessments.length, 5);

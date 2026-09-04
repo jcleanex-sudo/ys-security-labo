@@ -27,6 +27,7 @@ async function waitForRaceNumber(tab, expectedRaceNumber, timeoutMilliseconds = 
 }
 
 export const expectedOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2);
+export const expectedTrioOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2) / 6;
 
 async function extractBasic(tab) {
   return tab.playwright.evaluate(() => {
@@ -155,6 +156,35 @@ async function extractOddsUntilComplete(tab, oddsButton, timeoutMilliseconds = 6
   return best;
 }
 
+async function extractTrioOdds(tab) {
+  return tab.playwright.evaluate(() => {
+    const bodyText = document.body?.innerText || "";
+    const odds = {};
+    document.querySelectorAll('[id^="OZZ"]').forEach((element) => {
+      const match = element.id.match(/^OZZ([1-9])([1-9])([1-9])$/);
+      const value = (element.textContent || "").trim().replace(/,/g, "");
+      if (!match || !/^\d+(?:\.\d+)?$/.test(value)) return;
+      const numbers = match.slice(1).map(Number);
+      if (numbers[0] < numbers[1] && numbers[1] < numbers[2]) odds[numbers.join("-")] = Number(value);
+    });
+    return { odds, updatedAt: bodyText.match(/(\d{2}:\d{2})\s*現在/)?.[1] || "" };
+  });
+}
+
+async function extractTrioOddsUntilComplete(tab, trioButton, riderCount, timeoutMilliseconds = 4_000) {
+  const expected = expectedTrioOddsCount(riderCount);
+  const deadline = Date.now() + timeoutMilliseconds;
+  let best = { odds: {}, updatedAt: "" };
+  while (Date.now() < deadline) {
+    await trioButton.click({ force: true });
+    await pause(250);
+    const candidate = await extractTrioOdds(tab);
+    if (Object.keys(candidate.odds).length > Object.keys(best.odds).length) best = candidate;
+    if (expected > 0 && Object.keys(best.odds).length === expected) return best;
+  }
+  return best;
+}
+
 export async function collectVenue(browser, venue, config) {
   const tab = await browser.tabs.new();
   const saved = [];
@@ -240,6 +270,10 @@ export async function collectVenue(browser, venue, config) {
           await oddsButton.click({ force: true });
           await pause(320);
         }
+        const trioButton = tab.playwright.locator("#btnKake3Renhuku");
+        const trioData = await trioButton.count() === 1
+          ? await extractTrioOddsUntilComplete(tab, trioButton, oddsData.numbers.length || basic.riders.length)
+          : { odds: {}, updatedAt: "" };
         const riderMap = new Map((basic.riders || []).filter((rider) => rider.number).map((rider) => [rider.number, rider]));
         const riderNumbers = oddsData.numbers.length
           ? oddsData.numbers
@@ -271,6 +305,11 @@ export async function collectVenue(browser, venue, config) {
           odds: oddsData.odds,
           odds_count: oddsCount,
           expected_odds_count: expected,
+          trio_odds_type: "trio",
+          trio_odds_updated_at: trioData.updatedAt,
+          trio_odds: trioData.odds,
+          trio_odds_count: Object.keys(trioData.odds).length,
+          expected_trio_odds_count: expectedTrioOddsCount(riders.length),
           extracted_at: new Date().toISOString(),
         };
         const destination = await saveRaceRecord(record, config.outputDirectory);

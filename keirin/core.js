@@ -156,8 +156,12 @@ function permutations3(numbers) {
   return [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]];
 }
 
-export function buildTrioCandidates(scores) {
+export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
   const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
+  const expectedCount = numbers.length * (numbers.length - 1) * (numbers.length - 2) / 6;
+  const suppliedOdds = Object.entries(trioOdds || {}).filter(([, value]) => Number(value) > 1);
+  const oddsComplete = expectedCount > 0 && suppliedOdds.length === expectedCount;
+  const rawMarketTotal = oddsComplete ? suppliedOdds.reduce((sum, [, odds]) => sum + 1 / Number(odds), 0) : 0;
   const candidates = [];
   for (let first = 0; first < numbers.length - 2; first += 1) {
     for (let second = first + 1; second < numbers.length - 1; second += 1) {
@@ -165,16 +169,23 @@ export function buildTrioCandidates(scores) {
         const combination = [numbers[first], numbers[second], numbers[third]];
         const modelProbability = permutations3(combination)
           .reduce((sum, order) => sum + plackettLuceProbability(scores, order), 0);
+        const combo = combination.join("-");
+        const odds = oddsComplete ? Number(trioOdds[combo]) : null;
+        const rawMarketProbability = odds ? 1 / odds : null;
+        const marketProbability = odds ? rawMarketProbability / rawMarketTotal : null;
+        const netEdge = odds ? (modelProbability - rawMarketProbability) * 100 - Number(safetyMargin || 0) : null;
+        const expectedProfitYen = odds ? modelProbability * odds * 100 - 100 : null;
         candidates.push({
           betType: "3連複",
-          combo: combination.join("-"),
+          combo,
           numbers: combination,
           modelProbability,
-          odds: null,
-          rawMarketProbability: null,
-          netEdge: null,
-          expectedProfitYen: null,
-          status: "WATCH",
+          odds,
+          rawMarketProbability,
+          marketProbability,
+          netEdge,
+          expectedProfitYen,
+          status: odds ? (netEdge > 0 ? "WATCH" : "SKIP") : "DATA BLOCKED",
         });
       }
     }
@@ -264,7 +275,8 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const index = clamp(Math.round(25 + topWinProbability * 45 + agreement * 0.15 + dataRate * 0.03), 1, 90);
   const grade = index >= 82 ? "S" : index >= 72 ? "A" : index >= 62 ? "B" : "C";
   const ranked = [...tickets].sort((a, b) => b.modelProbability - a.modelProbability || a.odds - b.odds);
-  const trioCandidates = buildTrioCandidates(scores);
+  const trioCandidates = buildTrioCandidates(scores, race.trioOdds, safetyMargin);
+  const trioOddsComplete = trioCandidates.length > 0 && trioCandidates.every((ticket) => ticket.odds);
   const edgeTickets = [...tickets].filter((ticket) => ticket.netEdge > 0)
     .sort((a, b) => b.netEdge - a.netEdge || b.modelProbability - a.modelProbability);
   const selectionPassed = index >= 75 && agreement >= 75 && dataRate === 100;
@@ -286,6 +298,7 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     recommendation,
     logicName: "べた子式・競輪3連複中心 v2",
     primaryBetType: "3連複",
+    primaryOddsReady: trioOddsComplete,
     primaryTickets: trioCandidates.slice(0, 10),
     tickets: ranked.slice(0, 10),
     edgeTickets: edgeTickets.slice(0, 10),

@@ -1,4 +1,4 @@
-import { analyzeKeirinRace } from "./core.js?v=20260904-4";
+import { analyzeKeirinRace } from "./core.js?v=20260904-5";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -144,21 +144,21 @@ function renderRaceDetail() {
   $("#selectedVenue").textContent = venue?.name || "--";
   $("#selectedRace").textContent = `${race?.number ?? "--"}R`;
   const status = race?.status || "DATA BLOCKED";
+  const analysis = analyzeRace(race);
   $("#raceStatus").textContent = status;
   $("#raceStatus").className = `status ${status === "OK" ? "ok" : "blocked"}`;
   const ready = status === "OK";
   $("#blockedMessage").className = `alert blocked-alert${ready ? " ready" : ""}`;
   $("#blockedMessage").textContent = ready
-    ? "公式三連単オッズは検証済み。予想は3連複中心です。公式3連複オッズ取得まではnet edgeを確定しません。"
+    ? (analysis.primaryOddsReady ? "公式3連複オッズを全組合せ検証済み。net edgeを自動計算しています。" : "公式3連複オッズ取得待ち。推測せずnet edgeを停止しています。")
     : `DATA BLOCKED：${race?.blockReason || "公式データが未提供または不完全です。"}`;
   $("#riderNumbers").textContent = race?.riderNumbers?.length ? race.riderNumbers.join("・") : "未取得";
-  $("#oddsCompleteness").textContent = `${race?.oddsCount ?? 0} / ${race?.expectedOddsCount ?? "--"}`;
-  $("#oddsUpdated").textContent = race?.oddsUpdatedAt || "--";
+  $("#oddsCompleteness").textContent = `${race?.trioOddsCount ?? 0} / ${race?.expectedTrioOddsCount ?? "--"}`;
+  $("#oddsUpdated").textContent = race?.trioOddsUpdatedAt || race?.oddsUpdatedAt || "--";
   $("#raceClass").textContent = race?.raceClass || "クラス未取得";
   $("#raceDistance").textContent = race?.distanceM ? `${race.distanceM}m` : "距離未取得";
   $("#raceAlignment").textContent = race?.alignment || "未取得";
   const riders = [...(race?.riders || [])].sort((a, b) => a.number - b.number);
-  const analysis = analyzeRace(race);
   const assessmentByNumber = new Map((analysis.riderAssessments || []).map((item) => [item.number, item]));
   $("#raceEntries").replaceChildren(...(riders.length ? riders.map((rider) => {
     const row = document.createElement("tr");
@@ -195,7 +195,7 @@ function renderRaceDetail() {
     return item;
   }) : [Object.assign(document.createElement("div"), { className: "empty", textContent: "候補を表示できません。" })]));
   $("#currentDecision").textContent = race?.status === "OK" && analysis.modelReady ? analysis.recommendation : "DATA BLOCKED";
-  const allOdds = Object.entries(race?.odds || {});
+  const allOdds = Object.entries(race?.trioOdds || {});
   const odds = [...allOdds].sort((a, b) => a[1] - b[1]).slice(0, 18);
   const oddsCard = ([combo, value]) => {
     const item = document.createElement("div");
