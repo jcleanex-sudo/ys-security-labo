@@ -1,4 +1,4 @@
-import { analyzeKeirinRace } from "./core.js?v=20260904-2";
+import { analyzeKeirinRace } from "./core.js?v=20260904-3";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -168,7 +168,7 @@ function renderRaceDetail() {
     numberBadge.textContent = rider.number;
     numberCell.append(numberBadge);
     const assessment = assessmentByNumber.get(Number(rider.number));
-    const values = [rider.name, rider.prefecture, rider.classHistory, rider.style, assessment ? `${assessment.abilityIndex}（${assessment.rank}位）` : "--", assessment ? `${assessment.factorWins}/6・${assessment.role}` : "--"];
+    const values = [rider.name, rider.prefecture, rider.classHistory, rider.style, assessment ? `${assessment.abilityIndex}（${assessment.rank}位）` : "--", assessment ? `${assessment.tacticalIndex}・${assessment.tacticalLabel}` : "--", assessment ? `${assessment.factorWins}/6・${assessment.role}` : "--"];
     row.append(numberCell, ...values.map((value, index) => {
       const cell = document.createElement("td");
       if (index === 0) {
@@ -179,7 +179,7 @@ function renderRaceDetail() {
       return cell;
     }));
     return row;
-  }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 7; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
+  }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 8; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
   $("#aiIndexValue").textContent = analysis.index ? `${analysis.grade} / ${analysis.index}` : "--";
   $("#aiScenario").textContent = `${analysis.scenario}${analysis.modelReady ? ` データ取得率${analysis.dataRate}%・因子一致度${analysis.agreement}%・confidence ${analysis.confidence}%` : ""}`;
   $("#aiTenTickets").replaceChildren(...(analysis.tickets.length ? analysis.tickets.map((ticket, index) => {

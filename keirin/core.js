@@ -164,11 +164,16 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const rawMarketTotal = entries.reduce((sum, item) => sum + 1 / item.odds, 0);
   const marketEntries = entries.map((item) => ({ ...item, marketProbability: (1 / item.odds) / rawMarketTotal }));
   const riders = (race.riders || []).filter((rider) => Number.isInteger(Number(rider.number)));
+  const alignmentOrder = String(race?.alignment || "").match(/[1-9]/g)?.map(Number) || [];
+  const riderNumberSet = new Set(riders.map((rider) => Number(rider.number)));
+  const alignmentVerified = alignmentOrder.length === riders.length
+    && new Set(alignmentOrder).size === riders.length
+    && alignmentOrder.every((number) => riderNumberSet.has(number));
   const scores = officialRiderScores(riders);
   const requiredFields = ["rating", "winRate", "top2Rate", "top3Rate", "escapeWins", "sprintWins", "passWins", "markWins", "backstretch", "home", "starts"];
   const availableFields = riders.reduce((sum, rider) => sum + requiredFields.filter((field) => Number.isFinite(Number(rider.performance?.[field]))).length, 0);
   const performanceCoverage = riders.length ? availableFields / (riders.length * requiredFields.length) : 0;
-  if (scores.length !== riders.length) {
+  if (scores.length !== riders.length || !alignmentVerified) {
     return {
       ...market,
       modelReady: false,
@@ -177,7 +182,10 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
       dataRate: Math.round(performanceCoverage * 100),
       edgeTickets: [],
       tickets: market.tickets.map((ticket) => ({ ...ticket, modelProbability: null, marketProbability: null, netEdge: null })),
-      scenario: `公式4か月成績が${Math.round(performanceCoverage * 100)}%しか揃っていないため、独立モデルとnet edgeはDATA BLOCKEDです。市場人気は参考表示に限定します。`,
+      alignmentVerified,
+      scenario: !alignmentVerified
+        ? "公式の並び予想を全選手分確認できないため、べた子式の展開評価とnet edgeはDATA BLOCKEDです。"
+        : `公式4か月成績が${Math.round(performanceCoverage * 100)}%しか揃っていないため、独立モデルとnet edgeはDATA BLOCKEDです。市場人気は参考表示に限定します。`,
     };
   }
   const modelRaw = marketEntries.map((entry) => plackettLuceProbability(scores, entry.numbers));
@@ -200,12 +208,25 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const factorWinners = factors.map((factor) => [...riders].sort((a, b) => factorValue(b, factor) - factorValue(a, factor) || Number(a.number) - Number(b.number))[0]?.number);
   const agreement = Math.round(factorWinners.filter((number) => number === modelAxis).length / factors.length * 100);
   const riderAssessments = [...scores].sort((a, b) => b.score - a.score || a.number - b.number).map((rider, index) => ({
+    ...(() => {
+      const source = riders.find((item) => Number(item.number) === rider.number);
+      const p = source.performance;
+      const attack = Number(p.escapeWins) + Number(p.sprintWins) + Number(p.backstretch) * 0.5;
+      const chase = Number(p.passWins) + Number(p.markWins) + Number(p.home) * 0.25;
+      const tacticalRaw = source.style === "逃" ? attack : source.style === "追" ? chase : Math.max(attack, chase);
+      return { tacticalRaw, style: source.style || "--", alignmentPosition: alignmentOrder.indexOf(rider.number) + 1 };
+    })(),
     number: rider.number,
     rank: index + 1,
     abilityIndex: clamp(Math.round(50 + rider.score * 15), 1, 99),
     factorWins: factorWinners.filter((number) => number === rider.number).length,
     role: index === 0 ? "本命" : index === 1 ? "対抗" : index === 2 ? "単穴" : "相手",
   }));
+  const tacticalValues = riderAssessments.map((item) => item.tacticalRaw);
+  riderAssessments.forEach((item) => {
+    item.tacticalIndex = clamp(Math.round(50 + standardize(tacticalValues, item.tacticalRaw) * 15), 1, 99);
+    item.tacticalLabel = item.style === "逃" ? "先行" : item.style === "追" ? "追込" : "自在";
+  });
   const dataRate = Math.round(performanceCoverage * 100);
   const winWeights = scores.map((rider) => Math.exp(rider.score / 0.65));
   const topWinProbability = Math.max(...winWeights) / winWeights.reduce((sum, value) => sum + value, 0);
@@ -224,6 +245,8 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     confidence: index,
     agreement,
     dataRate,
+    alignmentVerified,
+    alignmentOrder,
     modelAxis,
     factorWinners,
     riderAssessments,
@@ -232,6 +255,6 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     logicName: "べた子式・競輪複合因子 v1",
     tickets: ranked.slice(0, 10),
     edgeTickets: edgeTickets.slice(0, 10),
-    scenario: `べた子式で競走得点・勝率・連対率・決まり手を複合評価。${modelAxis}番を能力軸候補とし、6因子一致度${agreement}%・指数${index}。オッズは予測へ混ぜず期待値判定だけに使用し、${selectionPassed ? "直前確認まではWATCH" : "公開基準未達のためSKIP"}です。`,
+    scenario: `べた子式で競走得点・勝率・連対率・決まり手・脚質別展開力を複合評価。公式並び${alignmentOrder.join("-")}を照合し、${modelAxis}番を能力軸候補、6因子一致度${agreement}%・指数${index}。${selectionPassed ? "直前確認まではWATCH" : "公開基準未達のためSKIP"}です。`,
   };
 }
