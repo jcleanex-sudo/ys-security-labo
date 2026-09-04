@@ -160,27 +160,28 @@ async function extractTrioOdds(tab) {
   return tab.playwright.evaluate(() => {
     const bodyText = document.body?.innerText || "";
     const odds = {};
-    document.querySelectorAll('[id^="OZZ"]').forEach((element) => {
+    const oddsElements = document.querySelectorAll('[id^="OZZ"]');
+    oddsElements.forEach((element) => {
       const match = element.id.match(/^OZZ([1-9])([1-9])([1-9])$/);
       const value = (element.textContent || "").trim().replace(/,/g, "");
       if (!match || !/^\d+(?:\.\d+)?$/.test(value)) return;
       const numbers = match.slice(1).map(Number);
       if (numbers[0] < numbers[1] && numbers[1] < numbers[2]) odds[numbers.join("-")] = Number(value);
     });
-    return { odds, updatedAt: bodyText.match(/(\d{2}:\d{2})\s*現在/)?.[1] || "" };
+    return { odds, domOddsCount: oddsElements.length, updatedAt: bodyText.match(/(\d{2}:\d{2})\s*現在/)?.[1] || "" };
   });
 }
 
 async function extractTrioOddsUntilComplete(tab, trioButton, riderCount, timeoutMilliseconds = 4_000) {
   const expected = expectedTrioOddsCount(riderCount);
   const deadline = Date.now() + timeoutMilliseconds;
-  let best = { odds: {}, updatedAt: "" };
+  let best = { odds: {}, domOddsCount: 0, updatedAt: "" };
   while (Date.now() < deadline) {
     await trioButton.click({ force: true });
     await pause(250);
     const candidate = await extractTrioOdds(tab);
-    if (Object.keys(candidate.odds).length > Object.keys(best.odds).length) best = candidate;
-    if (expected > 0 && Object.keys(best.odds).length === expected) return best;
+    if (candidate.domOddsCount === expected && Object.keys(candidate.odds).length === expected) return candidate;
+    if (candidate.domOddsCount === expected && Object.keys(candidate.odds).length > Object.keys(best.odds).length) best = candidate;
   }
   return best;
 }
