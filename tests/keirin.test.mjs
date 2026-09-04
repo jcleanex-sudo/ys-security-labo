@@ -74,7 +74,7 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   }
   const riders = [1, 2, 3, 4, 5].map((number) => ({
     number,
-    performance: { rating: 92 - number, winRate: 30 - number, top2Rate: 50 - number, top3Rate: 70 - number },
+    performance: { rating: 92 - number, winRate: 30 - number, top2Rate: 50 - number, top3Rate: 70 - number, escapeWins: 8 - number, sprintWins: 6 - number, passWins: 5 - number, markWins: 4 - number, backstretch: 10 - number, home: 8 - number, starts: 6 - number },
   }));
   const result = analyzeKeirinRace({ status: "OK", odds, riders });
   assert.equal(result.modelReady, true);
@@ -83,6 +83,25 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   assert.ok(result.agreement >= 0 && result.agreement <= 100);
   assert.ok(Number.isFinite(result.tickets[0].modelProbability));
   assert.ok(Number.isFinite(result.tickets[0].netEdge));
+  assert.equal(result.logicName, "べた子式・競輪複合因子 v1");
+  assert.equal(result.modelAxis, 1);
+  assert.equal(result.agreement, 100);
+  assert.notEqual(result.tickets[0].modelProbability, result.tickets[0].marketProbability);
+  assert.ok(Number.isFinite(result.tickets[0].expectedProfitYen));
+});
+
+test("betako safety gate marks weak factor agreement as SKIP", () => {
+  const odds = {};
+  for (const first of [1, 2, 3, 4, 5]) for (const second of [1, 2, 3, 4, 5]) for (const third of [1, 2, 3, 4, 5]) {
+    if (new Set([first, second, third]).size === 3) odds[`${first}-${second}-${third}`] = 5 + first + second + third;
+  }
+  const riders = [1, 2, 3, 4, 5].map((number) => ({
+    number,
+    performance: { rating: number === 1 ? 95 : 80 + number, winRate: number === 2 ? 40 : 10, top2Rate: number === 3 ? 60 : 20, top3Rate: number === 4 ? 80 : 30, escapeWins: number === 5 ? 9 : 1, sprintWins: 0, passWins: number === 2 ? 8 : 1, markWins: 0, backstretch: number, home: number, starts: number },
+  }));
+  const result = analyzeKeirinRace({ status: "OK", odds, riders });
+  assert.equal(result.selectionPassed, false);
+  assert.equal(result.recommendation, "SKIP");
 });
 
 test("hybrid edge stays blocked when official performance is incomplete", () => {

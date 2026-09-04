@@ -113,29 +113,33 @@ function standardize(values, value) {
 }
 
 function officialRiderScores(riders) {
+  const requiredFields = ["rating", "winRate", "top2Rate", "top3Rate", "escapeWins", "sprintWins", "passWins", "markWins", "backstretch", "home", "starts"];
   const usable = (riders || []).filter((rider) => {
     const performance = rider.performance || {};
-    return Number.isFinite(Number(performance.rating))
-      && Number.isFinite(Number(performance.winRate))
-      && Number.isFinite(Number(performance.top2Rate))
-      && Number.isFinite(Number(performance.top3Rate));
+    return requiredFields.every((field) => Number.isFinite(Number(performance[field])));
   });
   if (usable.length !== (riders || []).length || usable.length < 5) return [];
   const ratings = usable.map((rider) => Number(rider.performance.rating));
   const wins = usable.map((rider) => Number(rider.performance.winRate));
   const top2 = usable.map((rider) => Number(rider.performance.top2Rate));
   const top3 = usable.map((rider) => Number(rider.performance.top3Rate));
+  const attacks = usable.map((rider) => Number(rider.performance.escapeWins) + Number(rider.performance.sprintWins));
+  const positions = usable.map((rider) => Number(rider.performance.passWins) + Number(rider.performance.markWins));
+  const activities = usable.map((rider) => Number(rider.performance.backstretch) + Number(rider.performance.home) * 0.5 + Number(rider.performance.starts) * 0.25);
   return usable.map((rider) => ({
     number: Number(rider.number),
-    score: 0.45 * standardize(ratings, Number(rider.performance.rating))
-      + 0.30 * standardize(wins, Number(rider.performance.winRate))
-      + 0.15 * standardize(top2, Number(rider.performance.top2Rate))
-      + 0.10 * standardize(top3, Number(rider.performance.top3Rate)),
+    score: 0.38 * standardize(ratings, Number(rider.performance.rating))
+      + 0.22 * standardize(wins, Number(rider.performance.winRate))
+      + 0.14 * standardize(top2, Number(rider.performance.top2Rate))
+      + 0.10 * standardize(top3, Number(rider.performance.top3Rate))
+      + 0.08 * standardize(attacks, Number(rider.performance.escapeWins) + Number(rider.performance.sprintWins))
+      + 0.05 * standardize(positions, Number(rider.performance.passWins) + Number(rider.performance.markWins))
+      + 0.03 * standardize(activities, Number(rider.performance.backstretch) + Number(rider.performance.home) * 0.5 + Number(rider.performance.starts) * 0.25),
   }));
 }
 
-function plackettLuceProbability(scores, numbers) {
-  const pool = scores.map((rider) => ({ ...rider, weight: Math.exp(rider.score) }));
+function plackettLuceProbability(scores, numbers, temperature = 0.65) {
+  const pool = scores.map((rider) => ({ ...rider, weight: Math.exp(rider.score / temperature) }));
   let probability = 1;
   for (const number of numbers) {
     const total = pool.reduce((sum, rider) => sum + rider.weight, 0);
@@ -147,7 +151,7 @@ function plackettLuceProbability(scores, numbers) {
   return probability;
 }
 
-export function analyzeKeirinRace(race, { officialWeight = 0.25, costRate = 2 } = {}) {
+export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const market = analyzeMarketOdds(race?.odds, race?.status);
   if (race?.status !== "OK" || !market.tickets.length) {
     return { ...market, modelReady: false, confidence: 0, agreement: 0, dataRate: 0, edgeTickets: [] };
@@ -161,9 +165,9 @@ export function analyzeKeirinRace(race, { officialWeight = 0.25, costRate = 2 } 
   const marketEntries = entries.map((item) => ({ ...item, marketProbability: (1 / item.odds) / rawMarketTotal }));
   const riders = (race.riders || []).filter((rider) => Number.isInteger(Number(rider.number)));
   const scores = officialRiderScores(riders);
-  const performanceCoverage = riders.length
-    ? riders.filter((rider) => Number.isFinite(Number(rider.performance?.rating))).length / riders.length
-    : 0;
+  const requiredFields = ["rating", "winRate", "top2Rate", "top3Rate", "escapeWins", "sprintWins", "passWins", "markWins", "backstretch", "home", "starts"];
+  const availableFields = riders.reduce((sum, rider) => sum + requiredFields.filter((field) => Number.isFinite(Number(rider.performance?.[field]))).length, 0);
+  const performanceCoverage = riders.length ? availableFields / (riders.length * requiredFields.length) : 0;
   if (scores.length !== riders.length) {
     return {
       ...market,
@@ -176,32 +180,35 @@ export function analyzeKeirinRace(race, { officialWeight = 0.25, costRate = 2 } 
       scenario: `公式4か月成績が${Math.round(performanceCoverage * 100)}%しか揃っていないため、独立モデルとnet edgeはDATA BLOCKEDです。市場人気は参考表示に限定します。`,
     };
   }
-  const officialRaw = marketEntries.map((entry) => plackettLuceProbability(scores, entry.numbers));
-  const officialTotal = officialRaw.reduce((sum, probability) => sum + probability, 0) || 1;
-  const weight = clamp(Number(officialWeight), 0, 0.5);
+  const modelRaw = marketEntries.map((entry) => plackettLuceProbability(scores, entry.numbers));
+  const modelTotal = modelRaw.reduce((sum, probability) => sum + probability, 0) || 1;
   const tickets = marketEntries.map((entry, index) => {
-    const officialProbability = officialRaw[index] / officialTotal;
-    const modelProbability = (1 - weight) * entry.marketProbability + weight * officialProbability;
-    const netEdge = (modelProbability * entry.odds - 1) * 100 - Number(costRate || 0);
-    return { ...entry, officialProbability, modelProbability, netEdge };
+    const modelProbability = modelRaw[index] / modelTotal;
+    const rawMarketProbability = 1 / entry.odds;
+    const netEdge = (modelProbability - rawMarketProbability) * 100 - Number(safetyMargin || 0);
+    const expectedProfitYen = modelProbability * entry.odds * 100 - 100;
+    return { ...entry, officialProbability: modelProbability, modelProbability, rawMarketProbability, netEdge, expectedProfitYen };
   });
-  const firstMarket = new Map(riders.map((rider) => [Number(rider.number), 0]));
-  const firstOfficial = new Map(riders.map((rider) => [Number(rider.number), 0]));
-  for (const ticket of tickets) {
-    const first = ticket.numbers[0];
-    firstMarket.set(first, (firstMarket.get(first) || 0) + ticket.marketProbability);
-    firstOfficial.set(first, (firstOfficial.get(first) || 0) + ticket.officialProbability);
-  }
-  const totalVariation = 0.5 * [...firstMarket].reduce((sum, [number, probability]) =>
-    sum + Math.abs(probability - (firstOfficial.get(number) || 0)), 0);
-  const agreement = clamp(Math.round((1 - totalVariation) * 100), 0, 100);
+  const factorValue = (rider, factor) => {
+    const p = rider.performance;
+    if (factor === "attack") return Number(p.escapeWins) + Number(p.sprintWins);
+    if (factor === "position") return Number(p.passWins) + Number(p.markWins);
+    return Number(p[factor]);
+  };
+  const factors = ["rating", "winRate", "top2Rate", "top3Rate", "attack", "position"];
+  const modelAxis = [...scores].sort((a, b) => b.score - a.score || a.number - b.number)[0]?.number;
+  const factorWinners = factors.map((factor) => [...riders].sort((a, b) => factorValue(b, factor) - factorValue(a, factor) || Number(a.number) - Number(b.number))[0]?.number);
+  const agreement = Math.round(factorWinners.filter((number) => number === modelAxis).length / factors.length * 100);
   const dataRate = Math.round(performanceCoverage * 100);
-  const index = clamp(Math.round(market.index * 0.45 + agreement * 0.25 + dataRate * 0.30), 1, 94);
+  const winWeights = scores.map((rider) => Math.exp(rider.score / 0.65));
+  const topWinProbability = Math.max(...winWeights) / winWeights.reduce((sum, value) => sum + value, 0);
+  const index = clamp(Math.round(25 + topWinProbability * 45 + agreement * 0.15 + dataRate * 0.03), 1, 90);
   const grade = index >= 82 ? "S" : index >= 72 ? "A" : index >= 62 ? "B" : "C";
   const ranked = [...tickets].sort((a, b) => b.modelProbability - a.modelProbability || a.odds - b.odds);
   const edgeTickets = [...tickets].filter((ticket) => ticket.netEdge > 0)
     .sort((a, b) => b.netEdge - a.netEdge || b.modelProbability - a.modelProbability);
-  const axis = ranked[0]?.numbers[0];
+  const selectionPassed = index >= 75 && agreement >= 75 && dataRate === 100;
+  const recommendation = selectionPassed ? "WATCH" : "SKIP";
   return {
     index,
     grade,
@@ -210,8 +217,13 @@ export function analyzeKeirinRace(race, { officialWeight = 0.25, costRate = 2 } 
     confidence: index,
     agreement,
     dataRate,
+    modelAxis,
+    factorWinners,
+    selectionPassed,
+    recommendation,
+    logicName: "べた子式・競輪複合因子 v1",
     tickets: ranked.slice(0, 10),
     edgeTickets: edgeTickets.slice(0, 10),
-    scenario: `公式4か月成績と三連単市場を固定比率25:75で照合。${axis}番を中心候補とします。一致度${agreement}%で、学習ゲート通過前はnet edgeがプラスでもWATCHです。`,
+    scenario: `べた子式で競走得点・勝率・連対率・決まり手を複合評価。${modelAxis}番を能力軸候補とし、6因子一致度${agreement}%・指数${index}。オッズは予測へ混ぜず期待値判定だけに使用し、${selectionPassed ? "直前確認まではWATCH" : "公開基準未達のためSKIP"}です。`,
   };
 }

@@ -84,7 +84,7 @@ export async function buildLearningStatus(privateRoot) {
   }
   const labeled = [...latestResultByRace.values()].filter((record) => record.status === "OK" && Array.isArray(record.finish_order) && record.finish_order.length >= 3);
   let marketTop10Hits = 0;
-  let hybridTop10Hits = 0;
+  let betakoTop10Hits = 0;
   let evaluableRaces = 0;
   for (const [key, raceSnapshots] of snapshotsByRace) {
     const result = latestResultByRace.get(key);
@@ -107,17 +107,17 @@ export async function buildLearningStatus(privateRoot) {
     const marketTop10 = Object.entries(oddsRecord.odds).sort((a, b) => Number(a[1]) - Number(b[1])).slice(0, 10).map(([combo]) => combo);
     evaluableRaces += 1;
     if (marketTop10.includes(result.trifecta_combination)) marketTop10Hits += 1;
-    if (analysis.tickets.some((ticket) => ticket.combo === result.trifecta_combination)) hybridTop10Hits += 1;
+    if (analysis.tickets.some((ticket) => ticket.combo === result.trifecta_combination)) betakoTop10Hits += 1;
   }
   const diagnostics = {
     status: evaluableRaces ? "RETROSPECTIVE_ONLY" : "DATA BLOCKED",
-    fixedOfficialWeight: 0.25,
+    logicName: "べた子式・競輪複合因子 v1",
     evaluableRaces,
     marketTop10Hits,
-    hybridTop10Hits,
+    betakoTop10Hits,
     marketTop10HitRate: evaluableRaces ? Number((marketTop10Hits / evaluableRaces * 100).toFixed(1)) : null,
-    hybridTop10HitRate: evaluableRaces ? Number((hybridTop10Hits / evaluableRaces * 100).toFixed(1)) : null,
-    hybridHitRateInterval95: wilsonInterval(hybridTop10Hits, evaluableRaces),
+    betakoTop10HitRate: evaluableRaces ? Number((betakoTop10Hits / evaluableRaces * 100).toFixed(1)) : null,
+    betakoHitRateInterval95: wilsonInterval(betakoTop10Hits, evaluableRaces),
     eligibleForWeightUpdate: false,
   };
   const dataCompleteness = latest.length ? completeLatest / latest.length * 100 : 0;
@@ -145,14 +145,14 @@ export async function buildLearningStatus(privateRoot) {
     chronologicalSplit: false,
     profitFactor: null,
     maximumDrawdown: null,
-    confidenceInterval95: diagnostics.hybridHitRateInterval95,
+    confidenceInterval95: diagnostics.betakoHitRateInterval95,
     diagnostics,
     weightUpdateAllowed: safety.allowed,
     failedGates: safety.failed,
     limits: SAFETY_LIMITS,
     note: safety.allowed
       ? "全安全基準を通過しました。別工程の承認後にのみ重み更新できます。"
-      : "固定重みの回顧診断のみ実施。結果ラベル・検証期間・時系列分割が安全基準を満たすまで、重みは更新しません。",
+      : "べた子式・競輪複合因子の回顧診断のみ実施。結果ラベル・検証期間・時系列分割が安全基準を満たすまで、重みは更新しません。",
   };
 }
 
