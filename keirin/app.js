@@ -13,6 +13,9 @@ function formatOdds(value) { return Number(value).toLocaleString("ja-JP", { maxi
 function analyzeRace(race) {
   return analyzeKeirinRace(race);
 }
+function currentJstDate() {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
 
 async function loadData({ initial = false } = {}) {
   if (isRefreshing) return;
@@ -25,6 +28,13 @@ async function loadData({ initial = false } = {}) {
     ]);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     dataset = await response.json();
+    const dateMatches = dataset.raceDate === currentJstDate();
+    if (!dateMatches) {
+      dataset.venues = dataset.venues.map((venue) => ({
+        ...venue,
+        races: venue.races.map((race) => ({ ...race, status: "DATA BLOCKED", blockReason: `開催日不一致：保存${dataset.raceDate} / 今日${currentJstDate()}` })),
+      }));
+    }
     if (learningResponse.ok) renderLearning(await learningResponse.json());
     $("#raceDate").value = dataset.raceDate;
     if (initial || !selectedVenueCode) {
@@ -36,7 +46,9 @@ async function loadData({ initial = false } = {}) {
     if (!selectedRace()) selectedRaceNumber = selectedVenue()?.races[0]?.number || 1;
     renderAll();
     const updatedAt = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
-    $("#sourceBadge").textContent = `${fmtDate(dataset.raceDate)} / ${dataset.source}・自動更新 ${updatedAt}`;
+    $("#sourceBadge").textContent = dateMatches
+      ? `${fmtDate(dataset.raceDate)} / ${dataset.source}・自動更新 ${updatedAt}`
+      : `DATA BLOCKED：${fmtDate(dataset.raceDate)}は前日データ`;
   } catch (error) {
     $("#sourceBadge").textContent = "DATA BLOCKED";
     $("#blockedMessage").textContent = `表示データを読み込めません: ${error.message}`;
@@ -216,6 +228,14 @@ function syncUrl() { history.replaceState(null, "", `?venue=${encodeURIComponent
 function renderAll() { renderSummary(); renderRecommendations(); renderVenueTabs(); renderRaceTabs(); renderRaceDetail(); }
 
 $("#raceDate").onchange = () => { if ($("#raceDate").value !== dataset.raceDate) alert("現在保存されている取得日は " + dataset.raceDate + " です。"); $("#raceDate").value = dataset.raceDate; };
+$("#refreshButton").onclick = async () => {
+  const button = $("#refreshButton");
+  button.disabled = true;
+  button.textContent = "更新中…";
+  await loadData();
+  button.textContent = "更新済み";
+  setTimeout(() => { button.disabled = false; button.textContent = "最新に更新"; }, 1200);
+};
 $("#shareButton").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("#shareButton").textContent = "コピー済み"; } catch { prompt("共有URL", location.href); } };
 
 loadData({ initial: true });
