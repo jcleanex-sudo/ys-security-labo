@@ -54,6 +54,7 @@ export function analyzeMarketOdds(odds, status = "OK") {
 }
 
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
+const isUsableOfficialOdds = (value) => Number.isFinite(Number(value)) && Number(value) > 1 && Number(value) < 9999.9;
 
 export function parseOfficialPerformance(basicTables, riders) {
   const orderedRiders = [...(riders || [])]
@@ -159,7 +160,7 @@ function permutations3(numbers) {
 export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
   const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
   const expectedCount = numbers.length * (numbers.length - 1) * (numbers.length - 2) / 6;
-  const suppliedOdds = Object.entries(trioOdds || {}).filter(([, value]) => Number(value) > 1);
+  const suppliedOdds = Object.entries(trioOdds || {}).filter(([, value]) => isUsableOfficialOdds(value));
   const oddsComplete = expectedCount > 0 && suppliedOdds.length === expectedCount;
   const rawMarketTotal = oddsComplete ? suppliedOdds.reduce((sum, [, odds]) => sum + 1 / Number(odds), 0) : 0;
   const candidates = [];
@@ -196,7 +197,7 @@ export function buildTrioCandidates(scores, trioOdds = null, safetyMargin = 2) {
 export function buildTwoRiderCandidates(scores, oddsSource = null, unordered = false, safetyMargin = 2) {
   const numbers = [...scores].map((rider) => Number(rider.number)).sort((a, b) => a - b);
   const expectedCount = unordered ? numbers.length * (numbers.length - 1) / 2 : numbers.length * (numbers.length - 1);
-  const suppliedOdds = Object.entries(oddsSource || {}).filter(([, value]) => Number(value) > 1);
+  const suppliedOdds = Object.entries(oddsSource || {}).filter(([, value]) => isUsableOfficialOdds(value));
   const oddsComplete = expectedCount > 0 && suppliedOdds.length === expectedCount;
   const rawMarketTotal = oddsComplete ? suppliedOdds.reduce((sum, [, odds]) => sum + 1 / Number(odds), 0) : 0;
   const candidates = [];
