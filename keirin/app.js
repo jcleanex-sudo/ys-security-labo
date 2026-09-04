@@ -1,4 +1,4 @@
-import { analyzeKeirinRace } from "./core.js?v=20260904-5";
+import { analyzeKeirinRace } from "./core.js?v=20260905-2";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -162,7 +162,7 @@ function renderRaceDetail() {
   const ready = status === "OK";
   $("#blockedMessage").className = `alert blocked-alert${ready ? " ready" : ""}`;
   $("#blockedMessage").textContent = ready
-    ? (analysis.primaryOddsReady ? "公式3連複オッズを全組合せ検証済み。net edgeを自動計算しています。" : "公式3連複オッズ取得待ち。推測せずnet edgeを停止しています。")
+    ? (analysis.primaryOddsReady ? `公式オッズ確認済み：${analysis.availableBetTypes.join("・")}。混合10点を自動比較しています。` : "4券種の公式オッズ取得待ち。取得済み券種だけを表示します。")
     : `DATA BLOCKED：${race?.blockReason || "公式データが未提供または不完全です。"}`;
   $("#riderNumbers").textContent = race?.riderNumbers?.length ? race.riderNumbers.join("・") : "未取得";
   $("#oddsCompleteness").textContent = `${race?.trioOddsCount ?? 0} / ${race?.expectedTrioOddsCount ?? "--"}`;

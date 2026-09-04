@@ -28,6 +28,8 @@ async function waitForRaceNumber(tab, expectedRaceNumber, timeoutMilliseconds = 
 
 export const expectedOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2);
 export const expectedTrioOddsCount = (riderCount) => riderCount * (riderCount - 1) * (riderCount - 2) / 6;
+export const expectedExactaOddsCount = (riderCount) => riderCount * (riderCount - 1);
+export const expectedQuinellaOddsCount = (riderCount) => riderCount * (riderCount - 1) / 2;
 
 async function extractBasic(tab) {
   return tab.playwright.evaluate(() => {
@@ -186,6 +188,34 @@ async function extractTrioOddsUntilComplete(tab, trioButton, riderCount, timeout
   return best;
 }
 
+async function extractTwoRiderOdds(tab, unordered) {
+  return tab.playwright.evaluate((isUnordered) => {
+    const bodyText = document.body?.innerText || "";
+    const odds = {};
+    const oddsElements = document.querySelectorAll('[id^="OZZ"]');
+    oddsElements.forEach((element) => {
+      const match = element.id.match(/^OZZ([1-9])([1-9])$/);
+      const value = (element.textContent || "").trim().replace(/,/g, "");
+      if (!match || !/^\d+(?:\.\d+)?$/.test(value)) return;
+      const numbers = match.slice(1).map(Number);
+      if (!isUnordered || numbers[0] < numbers[1]) odds[numbers.join("-")] = Number(value);
+    });
+    return { odds, domOddsCount: oddsElements.length, updatedAt: bodyText.match(/(\d{2}:\d{2})\s*現在/)?.[1] || "" };
+  }, unordered);
+}
+
+async function extractTwoRiderOddsUntilComplete(tab, button, riderCount, unordered, timeoutMilliseconds = 4_000) {
+  const expected = unordered ? expectedQuinellaOddsCount(riderCount) : expectedExactaOddsCount(riderCount);
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    await button.click({ force: true });
+    await pause(250);
+    const candidate = await extractTwoRiderOdds(tab, unordered);
+    if (candidate.domOddsCount === expected && Object.keys(candidate.odds).length === expected) return candidate;
+  }
+  return { odds: {}, domOddsCount: 0, updatedAt: "" };
+}
+
 export async function collectVenue(browser, venue, config) {
   const tab = await browser.tabs.new();
   const saved = [];
@@ -275,6 +305,15 @@ export async function collectVenue(browser, venue, config) {
         const trioData = await trioButton.count() === 1
           ? await extractTrioOddsUntilComplete(tab, trioButton, oddsData.numbers.length || basic.riders.length)
           : { odds: {}, updatedAt: "" };
+        const riderCount = oddsData.numbers.length || basic.riders.length;
+        const exactaButton = tab.playwright.locator("#btnKake2Syatan");
+        const exactaData = await exactaButton.count() === 1
+          ? await extractTwoRiderOddsUntilComplete(tab, exactaButton, riderCount, false)
+          : { odds: {}, updatedAt: "" };
+        const quinellaButton = tab.playwright.locator("#btnKake2Syahuku");
+        const quinellaData = await quinellaButton.count() === 1
+          ? await extractTwoRiderOddsUntilComplete(tab, quinellaButton, riderCount, true)
+          : { odds: {}, updatedAt: "" };
         const riderMap = new Map((basic.riders || []).filter((rider) => rider.number).map((rider) => [rider.number, rider]));
         const riderNumbers = oddsData.numbers.length
           ? oddsData.numbers
@@ -311,6 +350,14 @@ export async function collectVenue(browser, venue, config) {
           trio_odds: trioData.odds,
           trio_odds_count: Object.keys(trioData.odds).length,
           expected_trio_odds_count: expectedTrioOddsCount(riders.length),
+          exacta_odds_updated_at: exactaData.updatedAt,
+          exacta_odds: exactaData.odds,
+          exacta_odds_count: Object.keys(exactaData.odds).length,
+          expected_exacta_odds_count: expectedExactaOddsCount(riders.length),
+          quinella_odds_updated_at: quinellaData.updatedAt,
+          quinella_odds: quinellaData.odds,
+          quinella_odds_count: Object.keys(quinellaData.odds).length,
+          expected_quinella_odds_count: expectedQuinellaOddsCount(riders.length),
           extracted_at: new Date().toISOString(),
         };
         const destination = await saveRaceRecord(record, config.outputDirectory);

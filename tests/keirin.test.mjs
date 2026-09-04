@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeKeirinRace, analyzeMarketOdds, buildKeirinFormation, buildTrioCandidates, keirinTicketEdge, orderedChance, parseOfficialPerformance, parseOfficialRiderIdentities } from "../keirin/core.js";
+import { analyzeKeirinRace, analyzeMarketOdds, buildKeirinFormation, buildTrioCandidates, buildTwoRiderCandidates, keirinTicketEdge, orderedChance, parseOfficialPerformance, parseOfficialRiderIdentities } from "../keirin/core.js";
 
 const riders = [
   { number: 1, score: 40 },
@@ -47,6 +47,17 @@ test("trio candidates calculate edge only with complete official odds", () => {
   assert.ok(candidates.every((ticket) => Number.isFinite(ticket.expectedProfitYen)));
   const incomplete = buildTrioCandidates(scores, { "1-2-3": 3.2 });
   assert.ok(incomplete.every((ticket) => ticket.netEdge === null));
+});
+
+test("two-rider candidates support exacta and quinella", () => {
+  const scores = [{ number: 1, score: 2 }, { number: 2, score: 1 }, { number: 3, score: 0 }];
+  const exacta = buildTwoRiderCandidates(scores, { "1-2": 3, "1-3": 4, "2-1": 5, "2-3": 6, "3-1": 7, "3-2": 8 });
+  const quinella = buildTwoRiderCandidates(scores, { "1-2": 2.5, "1-3": 4.5, "2-3": 7 }, true);
+  assert.equal(exacta.length, 6);
+  assert.equal(quinella.length, 3);
+  assert.equal(exacta[0].betType, "2車単");
+  assert.equal(quinella[0].betType, "2車複");
+  assert.ok(quinella[0].modelProbability > exacta[0].modelProbability);
 });
 
 test("market analysis returns an index and ten candidates", () => {
@@ -98,18 +109,25 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   }));
   const trioOdds = {};
   for (let a = 1; a <= 3; a += 1) for (let b = a + 1; b <= 4; b += 1) for (let c = b + 1; c <= 5; c += 1) trioOdds[`${a}-${b}-${c}`] = 5 + a + b + c;
-  const result = analyzeKeirinRace({ status: "OK", odds, trioOdds, riders, alignment: "1 2 3 4 5" });
+  const exactaOdds = {};
+  const quinellaOdds = {};
+  for (let a = 1; a <= 5; a += 1) for (let b = 1; b <= 5; b += 1) if (a !== b) {
+    exactaOdds[`${a}-${b}`] = 3 + a + b;
+    if (a < b) quinellaOdds[`${a}-${b}`] = 2 + a + b;
+  }
+  const result = analyzeKeirinRace({ status: "OK", odds, trioOdds, exactaOdds, quinellaOdds, riders, alignment: "1 2 3 4 5" });
   assert.equal(result.modelReady, true);
   assert.equal(result.dataRate, 100);
   assert.equal(result.tickets.length, 10);
   assert.ok(result.agreement >= 0 && result.agreement <= 100);
   assert.ok(Number.isFinite(result.tickets[0].modelProbability));
   assert.ok(Number.isFinite(result.tickets[0].netEdge));
-  assert.equal(result.logicName, "べた子式・競輪3連複中心 v2");
-  assert.equal(result.primaryBetType, "3連複");
+  assert.equal(result.logicName, "べた子式・競輪4券種混合 v3");
+  assert.equal(result.primaryBetType, "4券種混合");
   assert.equal(result.primaryTickets.length, 10);
   assert.ok(result.primaryTickets[0].modelProbability > 0);
   assert.equal(result.primaryOddsReady, true);
+  assert.deepEqual(new Set(result.primaryTickets.map((ticket) => ticket.betType)), new Set(["3連単", "3連複", "2車単", "2車複"]));
   assert.equal(result.modelAxis, 1);
   assert.equal(result.agreement, 100);
   assert.equal(result.riderAssessments.length, 5);

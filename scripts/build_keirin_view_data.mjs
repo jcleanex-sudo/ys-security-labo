@@ -93,6 +93,14 @@ for (const venueDir of venueDirs) {
       trioOddsCount: Object.keys(record.trio_odds || {}).length,
       expectedTrioOddsCount: record.expected_trio_odds_count ?? null,
       trioOdds: record.status === "OK" ? (record.trio_odds || {}) : {},
+      exactaOddsUpdatedAt: record.exacta_odds_updated_at || null,
+      exactaOddsCount: Object.keys(record.exacta_odds || {}).length,
+      expectedExactaOddsCount: record.expected_exacta_odds_count ?? null,
+      exactaOdds: record.status === "OK" ? (record.exacta_odds || {}) : {},
+      quinellaOddsUpdatedAt: record.quinella_odds_updated_at || null,
+      quinellaOddsCount: Object.keys(record.quinella_odds || {}).length,
+      expectedQuinellaOddsCount: record.expected_quinella_odds_count ?? null,
+      quinellaOdds: record.status === "OK" ? (record.quinella_odds || {}) : {},
     });
   }
   venues.push({
