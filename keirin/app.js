@@ -1,4 +1,4 @@
-import { analyzeKeirinRace } from "./core.js?v=20260904-1";
+import { analyzeKeirinRace } from "./core.js?v=20260904-2";
 
 const $ = (selector) => document.querySelector(selector);
 let dataset = { venues: [], raceDate: "" };
@@ -158,6 +158,8 @@ function renderRaceDetail() {
   $("#raceDistance").textContent = race?.distanceM ? `${race.distanceM}m` : "距離未取得";
   $("#raceAlignment").textContent = race?.alignment || "未取得";
   const riders = [...(race?.riders || [])].sort((a, b) => a.number - b.number);
+  const analysis = analyzeRace(race);
+  const assessmentByNumber = new Map((analysis.riderAssessments || []).map((item) => [item.number, item]));
   $("#raceEntries").replaceChildren(...(riders.length ? riders.map((rider) => {
     const row = document.createElement("tr");
     const numberCell = document.createElement("td");
@@ -165,7 +167,8 @@ function renderRaceDetail() {
     numberBadge.className = `rider-number number-${rider.number}`;
     numberBadge.textContent = rider.number;
     numberCell.append(numberBadge);
-    const values = [rider.name, rider.prefecture, rider.classHistory, rider.style];
+    const assessment = assessmentByNumber.get(Number(rider.number));
+    const values = [rider.name, rider.prefecture, rider.classHistory, rider.style, assessment ? `${assessment.abilityIndex}（${assessment.rank}位）` : "--", assessment ? `${assessment.factorWins}/6・${assessment.role}` : "--"];
     row.append(numberCell, ...values.map((value, index) => {
       const cell = document.createElement("td");
       if (index === 0) {
@@ -176,8 +179,7 @@ function renderRaceDetail() {
       return cell;
     }));
     return row;
-  }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 5; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
-  const analysis = analyzeRace(race);
+  }) : [(() => { const row = document.createElement("tr"); const cell = document.createElement("td"); cell.colSpan = 7; cell.textContent = "出走表を取得できません。"; row.append(cell); return row; })()]));
   $("#aiIndexValue").textContent = analysis.index ? `${analysis.grade} / ${analysis.index}` : "--";
   $("#aiScenario").textContent = `${analysis.scenario}${analysis.modelReady ? ` データ取得率${analysis.dataRate}%・因子一致度${analysis.agreement}%・confidence ${analysis.confidence}%` : ""}`;
   $("#aiTenTickets").replaceChildren(...(analysis.tickets.length ? analysis.tickets.map((ticket, index) => {

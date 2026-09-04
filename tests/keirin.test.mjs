@@ -86,6 +86,8 @@ test("hybrid analysis exposes model probability, agreement and net edge", () => 
   assert.equal(result.logicName, "べた子式・競輪複合因子 v1");
   assert.equal(result.modelAxis, 1);
   assert.equal(result.agreement, 100);
+  assert.equal(result.riderAssessments.length, 5);
+  assert.deepEqual(result.riderAssessments[0], { number: 1, rank: 1, abilityIndex: 71, factorWins: 6, role: "本命" });
   assert.notEqual(result.tickets[0].modelProbability, result.tickets[0].marketProbability);
   assert.ok(Number.isFinite(result.tickets[0].expectedProfitYen));
 });

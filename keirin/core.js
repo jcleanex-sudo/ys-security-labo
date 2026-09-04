@@ -199,6 +199,13 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
   const modelAxis = [...scores].sort((a, b) => b.score - a.score || a.number - b.number)[0]?.number;
   const factorWinners = factors.map((factor) => [...riders].sort((a, b) => factorValue(b, factor) - factorValue(a, factor) || Number(a.number) - Number(b.number))[0]?.number);
   const agreement = Math.round(factorWinners.filter((number) => number === modelAxis).length / factors.length * 100);
+  const riderAssessments = [...scores].sort((a, b) => b.score - a.score || a.number - b.number).map((rider, index) => ({
+    number: rider.number,
+    rank: index + 1,
+    abilityIndex: clamp(Math.round(50 + rider.score * 15), 1, 99),
+    factorWins: factorWinners.filter((number) => number === rider.number).length,
+    role: index === 0 ? "本命" : index === 1 ? "対抗" : index === 2 ? "単穴" : "相手",
+  }));
   const dataRate = Math.round(performanceCoverage * 100);
   const winWeights = scores.map((rider) => Math.exp(rider.score / 0.65));
   const topWinProbability = Math.max(...winWeights) / winWeights.reduce((sum, value) => sum + value, 0);
@@ -219,6 +226,7 @@ export function analyzeKeirinRace(race, { safetyMargin = 2 } = {}) {
     dataRate,
     modelAxis,
     factorWinners,
+    riderAssessments,
     selectionPassed,
     recommendation,
     logicName: "べた子式・競輪複合因子 v1",
